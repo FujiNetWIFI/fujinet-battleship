@@ -15,6 +15,11 @@
 #define REMOVE_PLAYER_KEY '/'
 #define INGAME_MENU_X WIDTH / 2 - 8
 
+#ifdef __WATCOMC__
+#include <conio.h>
+#define cgetc getch
+#endif
+
 bool inBorderedScreen = false, prevBorderedScreen = false, savedScreen = false;
 
 bool saveScreen()
