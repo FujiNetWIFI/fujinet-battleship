@@ -160,6 +160,29 @@ void restoreScreenBuffer()
 
 void drawPlayerName(uint8_t player, const char *name, bool active)
 {
+    uint8_t x, y;
+    uint16_t pos = fieldX + quadrant_offset[player];
+
+    x = (uint8_t)(pos % 32 + 1);
+    y = (uint8_t)(pos / 32 - 9);
+
+    if (player == 0 || player == 3)
+    {
+        y += 89;
+    }
+
+    // background = ROP_YELLOW;
+
+    if (active)
+    {
+        // hires_putc(x - 1, y, ROP_CPY, 0x05); // Arrow
+        drawTextAt(x, y, name);
+    }
+    else
+    {
+        // hires_putc(x - 1, y, ROP_CPY, 0x62); // Blank bkg
+        drawTextAltAt(x, y, name);
+    }
 }
 
 void drawText(uint8_t x, uint8_t y, const char *s)
@@ -184,26 +207,52 @@ void drawText(uint8_t x, uint8_t y, const char *s)
 
 void drawTextAt(uint8_t x, uint8_t y, const char *s)
 {
+    drawText(x,y,s);
 }
 
 void drawTextAlt(uint8_t x, uint8_t y, const char *s)
 {
+    drawText(x,y,s);
 }
 
 void drawTextAltAt(uint8_t x, uint8_t y, const char *s)
 {
+    drawText(x,y,s);
 }
 
 void resetScreen()
 {
+    clear(1);
 }
 
 void drawLegendShip(uint8_t player, uint8_t index, uint8_t size, uint8_t status)
 {
+    uint16_t dest = fieldX + quadrant_offset[player] + legendShipOffset[index];
+
+    if (player > 1 || (player > 0 && fieldX > 0))
+    {
+        dest += 256 + 11;
+    }
+    else
+    {
+        dest += 256 - 4;
+    }
+
+    if (status)
+    {
+        // Draw normal ship.
+        // drawShipInternal((uint8_t *)SCREEN + dest, size, 1);
+    }
+    else
+    {
+        // Draw shot ship
+        // hires_Draw((uint8_t)(dest % 32), (uint8_t)(dest / 32), 1, size * 8, ROP_CPY, &charset[(uint16_t)0x1c << 3]);
+    }
 }
 
 void drawGamefieldCursor(uint8_t quadrant, uint8_t x, uint8_t y, uint8_t *gamefield, uint8_t blink)
 {
+
 }
 
 // Updates the gamefield display at attackPos
@@ -245,10 +294,37 @@ void drawBoard(uint8_t playerCount)
 
 void drawLine(uint8_t x, uint8_t y, uint8_t w)
 {
+    uint16_t o = 0;
+    x <<=1;
+    w <<= 1;
+    o = y * 4 * VIDEO_LINE_BYTES + x;
+
+    // Adjust for bottom move underlines
+    if (y==24)
+        o+=2*VIDEO_LINE_BYTES;
+
+    _fmemset(&video[o], 0xAA, w);
+    _fmemset(&video[o+0x2000], 0xAA, w);
 }
 
 void drawBox(uint8_t x, uint8_t y, uint8_t w, uint8_t h)
 {
+    uint8_t i;
+
+    plot_tile(&pot_border[0],x,y);
+    plot_tile(&pot_border[2],x+w+1,y);
+    for (i=1;i<=w;i++) {
+        plot_tile(&pot_border[1],x+i,y);
+        plot_tile(&pot_border[1],x+i,y+h+1);
+    }
+
+    for (i=1;i<=h;i++) {
+        plot_tile(&pot_border[5],x,y+i);
+        plot_tile(&pot_border[5],x+w+1,y+i);
+    }
+
+    plot_tile(&pot_border[3],x,y+h+1);
+    plot_tile(&pot_border[4],x+w+1,y+h+1);
 }
 
 void resetGraphics()
@@ -257,8 +333,12 @@ void resetGraphics()
 
 void waitvsync()
 {
+    // Wait until we are in vsync
+    while (! (inp(0x3DA) & 0x08));
+    while (inp(0x3DA) & 0x08);
 }
 
 void drawBlank(uint8_t x, uint8_t y)
 {
+    plot_tile(ascii[0x20+mask],x,y);
 }
