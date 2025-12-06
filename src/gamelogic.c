@@ -289,10 +289,13 @@ void renderGameboard()
         }
         if (clientState.game.status >= STATUS_GAMESTART)
         {
-            // Draw player's ships
-            for (i = 0; i < 5; i++)
+            // Draw this player's ships
+            if (clientState.game.playerStatus != PLAYER_STATUS_VIEWING)
             {
-                drawShip(shipSize[i], clientState.game.myShips[i], 0);
+                for (i = 0; i < 5; i++)
+                {
+                    drawShip(shipSize[i], clientState.game.myShips[i], 0);
+                }
             }
 
             // Draw gamefield
@@ -416,19 +419,21 @@ void renderGameboard()
     // Draw ships that have been placed already
     if (clientState.game.status == STATUS_PLACE_SHIPS)
     {
-        if (clientState.game.playerStatus == PLAYER_STATUS_PLACE_SHIPS)
+        if (clientState.game.playerStatus != PLAYER_STATUS_VIEWING)
         {
-            handleShipPlacement();
-        }
-        else
-        {
-            // Draw already placed ships from game state
-            for (i = 0; i < 5; i++)
+            if (clientState.game.playerStatus == PLAYER_STATUS_PLACE_SHIPS)
             {
-                drawShip(shipSize[i], clientState.game.myShips[i], 0);
+                handleShipPlacement();
+            }
+            else
+            {
+                // Draw already placed ships from game state
+                for (i = 0; i < 5; i++)
+                {
+                    drawShip(shipSize[i], clientState.game.myShips[i], 0);
+                }
             }
         }
-
         if (clientState.game.status == STATUS_PLACE_SHIPS)
         {
             centerTextWide(5, clientState.game.prompt);
@@ -458,7 +463,7 @@ bool testShip(uint8_t shipSize, uint8_t pos)
     for (i = 0; i < shipSize; i++)
     {
         // if existing ship || outside V bounds || crossed H bounds, return false
-        if (tempBuffer[pos % 100] || pos > 199 || (i > 0 && pos < 100 && pos % 10 == 0))
+        if (tempBuffer[pos % 100] || pos > 199 || (i > 0 && pos <= 100 && pos % 10 == 0))
             return false;
 
         pos += (pos >= 100) ? 10 : 1;
