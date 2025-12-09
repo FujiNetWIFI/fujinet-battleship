@@ -19,11 +19,6 @@
 
 #define GAMEOVER_PROMPT_Y HEIGHT - 2
 
-#undef ESCAPE
-#define ESCAPE "BREAK"
-#undef ESC
-#define ESC "BRK"
-
 // Icons
 #define ICON_TEXT_CURSOR 0x3A
 #define ICON_PLAYER 0x2A

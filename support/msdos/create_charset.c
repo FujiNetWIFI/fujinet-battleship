@@ -1,5 +1,5 @@
 /**
- * @brief   Create character set based on charset.dat
+ * @brief   Create character set based on ascii.dat
  * @author  Thomas Cherryhomes
  * @email   thom dot cherryhomes at gmail dot com
  * @license gpl v. 3, see LICENSE
@@ -17,7 +17,7 @@ void write_header(FILE *dfp)
     fprintf(dfp,"  * @brief   Character set\n");
     fprintf(dfp,"  * @verbose Arranged as 256 entries of 16 bytes\n");
     fprintf(dfp," */\n\n");
-    fprintf(dfp,"unsigned char charset[256][16] = \n");
+    fprintf(dfp,"unsigned char ascii[256][16] = \n");
     fprintf(dfp,"{\n");
 }
 
@@ -48,18 +48,18 @@ void write_footer(FILE *dfp)
 
 int main(void)
 {
-    FILE *sfp = fopen("charset.dat","rb");
-    FILE *dfp = fopen("../../src/msdos/charset.c","wb");
+    FILE *sfp = fopen("ascii.dat","rb");
+    FILE *dfp = fopen("../../src/msdos/ascii.c","wb");
 
     if (!sfp)
     {
-        perror("error opening charset.dat");
+        perror("error opening ascii.dat");
         goto bye;
     }
 
     if (!dfp)
     {
-        perror("error opening charset.c");
+        perror("error opening ascii.c");
         goto bye;
     }
 

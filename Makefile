@@ -9,11 +9,8 @@
 # TO BUILD: Run 'make <platform>'
 
 PRODUCT = fbs
-<<<<<<< HEAD
-PLATFORMS = coco msdos
-=======
-PLATFORMS = coco atari
->>>>>>> main
+PLATFORMS = coco msdos atari
+
 #PLATFORMS = coco apple2 atari c64 adam msdos msxrom # TODO
 
 
@@ -23,7 +20,7 @@ PLATFORMS = coco atari
 SRC_DIRS = src src/%PLATFORM%
 
 # FUJINET_LIB - specify version such as 4.7.6, or leave empty for latest
-FUJINET_LIB = 
+FUJINET_LIB =
 
 #################################################################
 ## Compiler / Linker flags                                     ##
@@ -37,7 +34,7 @@ CFLAGS_EXTRA_COCO = \
 	-Wno-assign-in-condition \
 	-I src/include \
 	--no-relocate \
-	--intermediate 
+	--intermediate
 
 LDFLAGS_EXTRA_COCO = --limit=5fff --org=1000
 
@@ -47,7 +44,7 @@ LDFLAGS_EXTRA_COCO = --limit=5fff --org=1000
 #################################################################
 
 # Delete charset objects so every build gets the latest charset
-# from /support/[platform]/charset.fnt without needing to clean. 
+# from /support/[platform]/charset.fnt without needing to clean.
 $(PLATFORM)/r2r::
 	rm -f build/$(PLATFORM)/charset.o
 
@@ -73,7 +70,7 @@ coco/disk-post::
 #   Mount the disk in FujiNet-PC (assumes host 1 is SD)
 	curl -s "http://localhost:8000/browse/host/1/$(PRODUCT).dsk?action=newmount&slot=1&mode=r" >/dev/null
 	curl -s "http://localhost:8000/mount?mountall=1&redirect=1" >/dev/null
-#	
+#
 # 	Fast speed: -ui_active and -nothrottle starts the emulator in fast mode to quickly load the app. I then throttle it to 100% speed with a hotkey.
 #	cd ~/mame_coco;mame coco -ui_active -nothrottle -window -nomaximize -resolution 1200x1024 -autoboot_delay 2 -nounevenstretch  -autoboot_command "runm\"$(PRODUCT)\n"
 #	cd ~/mame_coco;mame coco3 -ui_active -nothrottle -window -nomaximize -resolution 1300x1024 -autoboot_delay 2 -nounevenstretch  -autoboot_command "runm\"$(PRODUCT)\n"

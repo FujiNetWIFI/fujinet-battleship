@@ -12,7 +12,6 @@
 #include "vars.h"
 
 extern unsigned char charset[];
-
 // I'm using the space XL/XE allocates to BASIC for player/missles, charset, and screen buffer/backup
 // On graphics initialization, I turn off BASIC, freeing up this space.
 
