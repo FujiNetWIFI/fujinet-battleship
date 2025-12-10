@@ -9,7 +9,7 @@
 # TO BUILD: Run 'make <platform>'
 
 PRODUCT = fbs
-PLATFORMS = coco atari
+PLATFORMS = coco atari c64
 #PLATFORMS = coco apple2 atari c64 adam msdos msxrom # TODO
 
 
