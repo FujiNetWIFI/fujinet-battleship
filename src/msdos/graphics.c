@@ -234,6 +234,33 @@ void initGraphics()
     r.h.ah = 0x00;
     r.h.al = 0x04; // 320x200x4
     int86(0x10,&r,&r);
+
+    // Set Background Color
+    r.h.ah = 0x0b;
+    r.h.bh = 0x00;
+    r.h.bl = 0x01; // Blue
+    int86(0x10,&r,&r);
+
+    // remap palette
+    r.h.ah = 0x10;
+    r.h.al = 0x00;
+    r.h.bl = 1;
+    r.h.bh = 0x0a;
+    int86(0x10,&r,&r);
+
+    // remap palette
+    r.h.ah = 0x10;
+    r.h.al = 0x00;
+    r.h.bl = 2;
+    r.h.bh = 0x0C;
+    int86(0x10,&r,&r);
+
+    // remap palette
+    r.h.ah = 0x10;
+    r.h.al = 0x00;
+    r.h.bl = 3;
+    r.h.bh = 0x0f;
+    int86(0x10,&r,&r);
 }
 
 /**
