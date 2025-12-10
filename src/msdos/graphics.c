@@ -21,6 +21,11 @@ extern unsigned char charset[256][16];
 extern unsigned char ascii[256][16];
 
 /**
+ * @brief backing store for plot_tile
+ */
+unsigned char backing_store[WIDTH][HEIGHT];
+
+/**
  * @brief pointer to the B800 video segment for CGA
  */
 #define VIDEO_RAM_ADDR ((unsigned char far *)0xB8000000UL)
@@ -72,6 +77,11 @@ static unsigned char playerCount = 0;
  * #brief not sure why this is here
  */
 static unsigned char inGameCharSet = 0;
+
+/**
+ * @brief Flag to indicate cursor visibility
+ */
+static bool cursorVisible = false;
 
 /**
  * @brief plot a 8x8 2bpp tile to screen at column x, row y
@@ -148,23 +158,25 @@ void plot_char(unsigned char x,
     }
 
     // Yes, this is unrolled.
-    tile[0]=charset[c][0] ^ i & mask;
-    tile[1]=charset[c][1] ^ i & mask;
-    tile[2]=charset[c][2] ^ i & mask;
-    tile[3]=charset[c][3] ^ i & mask;
-    tile[4]=charset[c][4] ^ i & mask;
-    tile[5]=charset[c][5] ^ i & mask;
-    tile[6]=charset[c][6] ^ i & mask;
-    tile[7]=charset[c][7] ^ i & mask;
-    tile[8]=charset[c][8] ^ i & mask;
-    tile[9]=charset[c][9] ^ i & mask;
-    tile[10]=charset[c][10] ^ i & mask;
-    tile[11]=charset[c][11] ^ i & mask;
-    tile[12]=charset[c][12] ^ i & mask;
-    tile[13]=charset[c][13] ^ i & mask;
-    tile[14]=charset[c][14] ^ i & mask;
-    tile[15]=charset[c][15] ^ i & mask;
-    tile[16]=charset[c][16] ^ i & mask;
+    tile[0]=ascii[c][0] ^ i & mask;
+    tile[1]=ascii[c][1] ^ i & mask;
+    tile[2]=ascii[c][2] ^ i & mask;
+    tile[3]=ascii[c][3] ^ i & mask;
+    tile[4]=ascii[c][4] ^ i & mask;
+    tile[5]=ascii[c][5] ^ i & mask;
+    tile[6]=ascii[c][6] ^ i & mask;
+    tile[7]=ascii[c][7] ^ i & mask;
+    tile[8]=ascii[c][8] ^ i & mask;
+    tile[9]=ascii[c][9] ^ i & mask;
+    tile[10]=ascii[c][10] ^ i & mask;
+    tile[11]=ascii[c][11] ^ i & mask;
+    tile[12]=ascii[c][12] ^ i & mask;
+    tile[13]=ascii[c][13] ^ i & mask;
+    tile[14]=ascii[c][14] ^ i & mask;
+    tile[15]=ascii[c][15] ^ i & mask;
+    tile[16]=ascii[c][16] ^ i & mask;
+
+    plot_tile(tile, x, y);
 }
 
 /**
@@ -308,6 +320,7 @@ void waitvsync()
 void drawIcon(unsigned char x, unsigned char y, unsigned char icon)
 {
     plot_tile(&charset[icon], x, y);
+    backing_store[x][y] = icon;
 }
 
 /**
@@ -318,6 +331,7 @@ void drawIcon(unsigned char x, unsigned char y, unsigned char icon)
 void drawBlank(unsigned char x, unsigned char y)
 {
     plot_tile(&charset[0x00], x, y);
+    backing_store[x][y] = 0x00;
 }
 
 /**
@@ -556,4 +570,250 @@ void drawLine(unsigned char x, unsigned char y, unsigned char w)
 {
     while (w--)
         plot_tile(&charset[0x3F], x++, y);
+}
+
+/**
+ * @brief draw ship, shared between a few routines
+ * @param x Horizontal position (0-39)
+ * @param y Vertical position (0-24)
+ * @param size Size of ship (1-5)
+ * @param delta (0=horizontal 1-vertical)
+ */
+void drawShipInternal(unsigned char x, unsigned char y, unsigned char size, unsigned char delta)
+{
+    uint8_t i=0;
+    uint8_t c = delta ? 0x37 : 0x32; // Left segment of horizontal ship
+
+    if (delta)
+    {
+        // Vertical
+        backing_store[x][y] = c;
+        drawIcon(x, y++, c--); // top
+
+        while (size>1) // middle
+        {
+            backing_store[x][y] = c;
+            drawIcon(x, y++, c);
+            size--;
+        }
+
+        c--;                 // bottom
+        drawIcon(x, y++, c);
+        backing_store[x][y] = c;
+    }
+    else
+    {
+        // Horizontal
+        drawIcon(x++, y, c++); // Left
+
+        while (size>1) // middle
+        {
+            backing_store[x][y] = c;
+            drawIcon(x++, y, c);
+            size--;
+        }
+
+        c++;                  // Bottom
+        backing_store[x][y] = c;
+        drawIcon(x++, y, c);
+    }
+}
+
+/**
+ * @brief Draw ship at position on sea
+ * @param size size of ship (1-5?)
+ * @param pos Grid position (0-99)
+ * @param hide make invisible?
+ */
+void drawShip(unsigned char size, unsigned char pos, bool hide)
+{
+    uint8_t i = 0, delta = 0;
+    uint8_t x = 0, y = 0;
+
+    if (pos > 99)
+    {
+        delta = 1;
+        pos -= 100;
+    }
+
+    x = pos % 10;
+    y = pos / 10;
+
+    x += fieldX + quadrant_offset[0][0];
+    y += quadrant_offset[0][1];
+
+    if (hide)
+    {
+        int i = 0;
+
+        if (!delta)
+        {
+            for (i=0;i<size;i++)
+            {
+                backing_store[x][y] = 0x38;
+                drawIcon(x++, y, 0x38);
+            }
+        }
+        else
+        {
+            for (i=0;i<size;i++)
+            {
+                backing_store[x][y] = 0x38;
+                drawIcon(x, y++, 0x38);
+            }
+        }
+
+        return;
+    }
+    else
+    {
+        drawShipInternal(x, y, size, delta);
+    }
+}
+
+/**
+ * @brief Draw a ship in the drawer
+ * @param player Player # (0-3)
+ * @param index Ship # (0-4)
+ * @param size Size (1-5)
+ * @param status Status (0-1) (dead-alive)
+ */
+void drawLegendShip(uint8_t player, uint8_t index, uint8_t size, uint8_t status)
+{
+    uint8_t i=0;
+    uint8_t x=quadrant_offset[player][0];
+    uint8_t y=quadrant_offset[player][1];
+
+    if (player > 1 || (player > 0 && fieldX > 0))
+    {
+        y++;
+        x+=11;
+    }
+    else
+    {
+        x += WIDTH-4;
+    }
+
+    if (status)
+    {
+        drawShipInternal(x, y, size, 1); // draw a nice vertical ship
+    }
+    else
+    {
+        // Draw the red splats, instead
+        for (i=0;i<size;i++)
+            drawIcon(x,y+i,0x1C);
+    }
+}
+
+/**
+ * @brief Draw game field for given quadrant
+ * @param quadrant Player to draw (0-3)
+ * @param field Pointer to each 10x10 field array
+ */
+void drawGamefield(uint8_t quadrant, uint8_t *field)
+{
+    uint8_t ix=0, iy=0;
+    uint8_t x = quadrant_offset[quadrant][0];
+    uint8_t y = quadrant_offset[quadrant][1];
+
+    for (iy=0;iy<10;iy++)
+    {
+        for (ix=0;ix<10;ix++)
+        {
+            if (*field)
+            {
+                drawIcon(x+ix, y+iy, *field == 1 ? 0x39 : 0xE1);
+                backing_store[x+ix][y+iy] = (*field == 1 ? 0x39 : 0xE1);
+            }
+            field++;
+        }
+    }
+}
+
+/**
+ * @brief paint cursor
+ */
+void xorCursor(void)
+{
+    // Need to figure out wtf to do here
+}
+
+/**
+ * @brief Update game field
+ * @param quadrant player # (0-3)
+ * @param gamefield pointer to gamefield to update
+ * @param attackPos Position to attach (0-99)
+ * @param blink Blink state
+ */
+void drawGamefieldUpdate(uint8_t quadrant, uint8_t *gamefield, uint8_t attackPos, uint8_t blink)
+{
+    uint8_t x=quadrant_offset[quadrant][0] + fieldX + (attackPos % 10);
+    uint8_t y=quadrant_offset[quadrant][1] + (attackPos / 10);
+    uint8_t c=gamefield[attackPos];
+
+    if (cursorVisible)
+    {
+        cursorVisible=false;
+        xorCursor();
+    }
+
+    // Animate attack (only in empty sea cell)
+    if (blink > 9 && (backing_store[x][y] == 0x38 || backing_store[x][y] > 226))
+    {
+        drawIcon(x, y, 217+blink);
+        backing_store[x][y] = 217+blink;
+        return;
+    }
+
+    if (c == FIELD_ATTACK)
+    {
+        drawIcon(x, y, blink ? 0x1B : 0x39);
+        backing_store[x][y] = blink ? 0x1b : 0x39;
+    }
+    else if (c == FIELD_MISS)
+    {
+        drawIcon(x, y, 0xE1);
+        backing_store[x][y] = 0xE1;
+    }
+}
+
+/**
+ * @brief Draw game field cursor
+ */
+void drawGamefieldCursor(uint8_t quadrant, uint8_t x, uint8_t y, uint8_t *gamefield, uint8_t blink)
+{
+    // Ugh I don't wanna do this yet.
+}
+
+/**
+ * @brief Draw end game message
+ * @param message ptr to end game message
+ */
+void drawEndgameMessage(const char *message)
+{
+    uint8_t i, x, ix;
+    i = (uint8_t)strlen(message);
+    x = WIDTH / 2 - i / 2;
+
+    for (ix=0;ix<WIDTH;ix++)
+        drawIcon(ix, WIDTH-2, 0xE2);
+    for (ix=0;ix<WIDTH;ix++)
+        drawIcon(ix, WIDTH-1, 0x40);
+    drawText(x,HEIGHT-1,message);
+}
+
+/**
+ * @brief Draw a box
+ * @param x left of box (0-39)
+ * @param y top of box (0-24)
+ * @param w width of box (0-39)
+ * @param h height of box (0-24)
+ */
+void drawBox(unsigned char x, unsigned char y, unsigned char w, unsigned char h)
+{
+    drawIcon(x, y, 0x3b);
+    drawIcon(x+w,y,0x3c);
+    drawIcon(x, y+h, 0x3D);
+    drawIcon(x+w, y+h, 0x3E);
 }
