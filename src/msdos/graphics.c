@@ -11,6 +11,7 @@
 #include "../platform-specific/graphics.h"
 #include "../platform-specific/sound.h"
 #include "../misc.h"
+#include <stdio.h>
 
 /* Based on the atari graphics.c */
 
@@ -19,11 +20,6 @@
  */
 extern unsigned char charset[256][16];
 extern unsigned char ascii[256][16];
-
-/**
- * @brief backing store for plot_tile
- */
-unsigned char backing_store[WIDTH][HEIGHT];
 
 /**
  * @brief pointer to the B800 video segment for CGA
@@ -190,7 +186,6 @@ void plotName(unsigned char x, unsigned char y, unsigned char color, const char 
         plot_char(x++, y, color, 1, c);
     }
 }
-
 
 /**
  * @brief Clear screen to given color index
@@ -374,7 +369,6 @@ void waitvsync()
 void drawIcon(unsigned char x, unsigned char y, unsigned char icon)
 {
     plot_tile(&charset[icon], x, y);
-    backing_store[x][y] = icon;
 }
 
 /**
@@ -385,7 +379,6 @@ void drawIcon(unsigned char x, unsigned char y, unsigned char icon)
 void drawBlank(unsigned char x, unsigned char y)
 {
     plot_tile(&charset[0x00], x, y);
-    backing_store[x][y] = 0x00;
 }
 
 /**
@@ -643,19 +636,16 @@ void drawShipInternal(unsigned char x, unsigned char y, unsigned char size, unsi
     if (delta)
     {
         // Vertical
-        backing_store[x][y] = c;
         drawIcon(x, y++, c--); // top
 
         while (size>2) // middle
         {
-            backing_store[x][y] = c;
             drawIcon(x, y++, c);
             size--;
         }
 
         c--;                 // bottom
         drawIcon(x, y++, c);
-        backing_store[x][y] = c;
     }
     else
     {
@@ -664,13 +654,11 @@ void drawShipInternal(unsigned char x, unsigned char y, unsigned char size, unsi
 
         while (size>2) // middle
         {
-            backing_store[x][y] = c;
             drawIcon(x++, y, c);
             size--;
         }
 
         c++;                  // Bottom
-        backing_store[x][y] = c;
         drawIcon(x++, y, c);
     }
 }
@@ -706,7 +694,6 @@ void drawShip(unsigned char size, unsigned char pos, bool hide)
         {
             for (i=0;i<size;i++)
             {
-                backing_store[x][y] = 0x38;
                 drawIcon(x++, y, 0x38);
             }
         }
@@ -714,7 +701,6 @@ void drawShip(unsigned char size, unsigned char pos, bool hide)
         {
             for (i=0;i<size;i++)
             {
-                backing_store[x][y] = 0x38;
                 drawIcon(x, y++, 0x38);
             }
         }
@@ -781,7 +767,6 @@ void drawGamefield(uint8_t quadrant, uint8_t *field)
             if (*field)
             {
                 drawIcon(x+ix, y+iy, *field == 1 ? 0x39 : 0xE1);
-                backing_store[x+ix][y+iy] = (*field == 1 ? 0x39 : 0xE1);
             }
             field++;
         }
@@ -816,22 +801,19 @@ void drawGamefieldUpdate(uint8_t quadrant, uint8_t *gamefield, uint8_t attackPos
     }
 
     // Animate attack (only in empty sea cell)
-    if (blink > 9 && (backing_store[x][y] == 0x38 || backing_store[x][y] > 226))
+    if (blink > 9 && (gamefield[attackPos] == 0))
     {
         drawIcon(x, y, 217+blink);
-        backing_store[x][y] = 217+blink;
         return;
     }
 
     if (c == FIELD_ATTACK)
     {
         drawIcon(x, y, blink ? 0x1B : 0x39);
-        backing_store[x][y] = blink ? 0x1b : 0x39;
     }
     else if (c == FIELD_MISS)
     {
         drawIcon(x, y, 0xE1);
-        backing_store[x][y] = 0xE1;
     }
 }
 
@@ -842,20 +824,24 @@ void drawGamefieldCursor(uint8_t quadrant, uint8_t x, uint8_t y, uint8_t *gamefi
 {
     unsigned char ex = quadrant_offset[quadrant][0] + fieldX + x;
     unsigned char ey = quadrant_offset[quadrant][1] + y;
-    unsigned char c = 0;
+    unsigned char pos = (y*10) + x;
 
-    switch (backing_store[x][y])
+    unsigned char c = 0;
+    char tmp[3] = {0,0,0};
+
+    switch (gamefield[pos])
     {
-    case 0x1b:
-        c = 0x10;
+    case FIELD_ATTACK:
+        c = 0x43;
         break;
-    case 0x39:
-        c = 0x39;
+    case FIELD_MISS:
+        c = 0x46;
         break;
-    case 0xe1:
-        c = 0x12;
+    default:
+        c = 0x40;
         break;
     }
+
     drawIcon(ex, ey, c + blink);
 }
 
