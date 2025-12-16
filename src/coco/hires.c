@@ -7,7 +7,7 @@
 #include "hires.h"
 #include "vars.h"
 
-uint8_t background = 0;
+ROP_TYPE background = 0;
 extern uint8_t charset[];
 
 /*-----------------------------------------------------------------------*/
@@ -58,6 +58,20 @@ void hires_Draw(uint8_t x, uint8_t y, uint8_t xlen, uint8_t ylen, ROP_TYPE rop, 
 
     if (background)
     {
+        for (c = 0; c < ylen; ++c)
+        {
+            for (j = 0; j < xlen; j++)
+            {
+                *dest++ = *src16 & rop | background;
+                *dest++ = *(src16 + 1) & rop | background;
+            }
+            dest += WIDTH * 2 - j * 2;
+            src16 += 2;
+
+            // Wrap around to beginning of source character
+            if ((c & 7) == 7)
+                src16 -= 16;
+        }
     }
     else
     {

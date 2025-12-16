@@ -7,6 +7,5 @@
         SECTION rodata
         EXPORT _charset
 _charset
-;;        INCLUDEBIN ../../support/coco/charset-16.img.bin
-        INCLUDEBIN ../../support/coco/charset.fnt
+        INCLUDEBIN ../../support/coco/charset.bin
         ENDSECTION

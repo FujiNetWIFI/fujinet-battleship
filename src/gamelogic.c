@@ -7,7 +7,7 @@
 #include "misc.h"
 #include "stateclient.h"
 #include "screens.h"
-//#include <peekpoke.h>
+// #include <peekpoke.h>
 
 #ifdef __WATCOMC__
 #define cgetc getch
@@ -391,15 +391,24 @@ void renderGameboard()
 
         if (clientState.game.status != STATUS_GAMEOVER || redraw || clientState.game.status != state.prevStatus)
         {
+            // Clear active player
             for (i = 0; i < clientState.game.playerCount; i++)
             {
                 // Draw player name
-                drawPlayerName(i, i == 0 && clientState.game.playerStatus != PLAYER_STATUS_VIEWING ? "you" : (const char *)clientState.game.players[i].name, i == clientState.game.activePlayer);
+                if (i != clientState.game.activePlayer)
+                    drawPlayerName(i, i == 0 && clientState.game.playerStatus != PLAYER_STATUS_VIEWING ? "you" : (const char *)clientState.game.players[i].name, false);
+            }
+
+            // Show active player
+            if (clientState.game.activePlayer >= 0)
+            {
+                drawPlayerName(clientState.game.activePlayer, clientState.game.activePlayer == 0 && clientState.game.playerStatus != PLAYER_STATUS_VIEWING ? "you" : (const char *)clientState.game.players[clientState.game.activePlayer].name, true);
             }
 
             // Blink active player
             if (clientState.game.activePlayer > 0)
             {
+
                 pause(15);
                 drawPlayerName(clientState.game.activePlayer, clientState.game.players[clientState.game.activePlayer].name, false);
 

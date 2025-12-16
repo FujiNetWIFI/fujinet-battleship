@@ -11,9 +11,9 @@
 PRODUCT = fbs
 PLATFORMS = coco msdos atari
 
+# WIP: To build for coco3, run: make coco MAKE_COCO3=COCO3
+
 #PLATFORMS = coco apple2 atari c64 adam msdos msxrom # TODO
-
-
 
 # SRC_DIRS may use the literal %PLATFORM% token.
 # It expands to the chosen PLATFORM plus any of its combos.
@@ -29,15 +29,20 @@ FUJINET_LIB =
 ## Include platform specific vars.h
 CFLAGS += -DPLATFORM_VARS="\"../$(PLATFORM)/vars.h\""
 
-## COCO (CMOC)
 CFLAGS_EXTRA_COCO = \
 	-Wno-assign-in-condition \
 	-I src/include \
 	--no-relocate \
 	--intermediate
 
-LDFLAGS_EXTRA_COCO = --limit=5fff --org=1000 # Coco1/2
-#LDFLAGS_EXTRA_COCO = --limit=7800 --org=1000 # Coco3
+## COCO (CMOC)
+ifeq ($(MAKE_COCO3),COCO3)
+	CFLAGS_EXTRA_COCO += -DCOCO3
+	LDFLAGS_EXTRA_COCO = --limit=7800 --org=1000 # Coco3
+else
+	LDFLAGS_EXTRA_COCO = --limit=5fff --org=1000 # Coco1/2
+endif
+
 
 
 #################################################################
@@ -46,9 +51,15 @@ LDFLAGS_EXTRA_COCO = --limit=5fff --org=1000 # Coco1/2
 
 # Delete charset objects so every build gets the latest charset
 # from /support/[platform]/charset.fnt without needing to clean.
+# COCO ONLY - copy proper file for Coco1/2 vs Coco3
 $(PLATFORM)/r2r::
+	rm -rf $(OBJ_DIR)
 	rm -f build/$(PLATFORM)/charset.o
-
+ifeq ($(MAKE_COCO3),COCO3)
+	cp support/coco/charset-16.img.bin support/coco/charset.bin
+else
+	cp support/coco/charset.fnt support/coco/charset.bin
+endif
 
 #################################################################
 # Include MekkoGX makefile system (Make Gen-X)
@@ -73,9 +84,13 @@ coco/disk-post::
 	curl -s "http://localhost:8000/mount?mountall=1&redirect=1" >/dev/null
 #
 # 	Fast speed: -ui_active and -nothrottle starts the emulator in fast mode to quickly load the app. I then throttle it to 100% speed with a hotkey.
-#	cd ~/mame_coco;mame coco -ui_active -nothrottle -window -nomaximize -resolution 1200x1024 -autoboot_delay 2 -nounevenstretch  -autoboot_command "runm\"$(PRODUCT)\n"
+
 #	cd ~/mame_coco;mame coco3 -ui_active -nothrottle -window -nomaximize -resolution 1300x1024 -autoboot_delay 2 -nounevenstretch  -autoboot_command "runm\"$(PRODUCT)\n"
+ifeq ($(MAKE_COCO3),COCO3)
 	cd ~/mame_coco;mame coco3 -ui_active -nothrottle -window -nomaximize -resolution 1300x1024 -autoboot_delay 2 -nounevenstretch  -autoboot_command "runm\"$(PRODUCT)\n"
+else
+	cd ~/mame_coco;mame coco -ui_active -nothrottle -window -nomaximize -resolution 1200x1024 -autoboot_delay 2 -nounevenstretch  -autoboot_command "runm\"$(PRODUCT)\n"
+endif
 # Start normal speed
 #	cd ~/mame_coco;mame coco -ui_active -throttle -window -nomaximize -resolution 1200x1024 -autoboot_delay 2 -nounevenstretch  -autoboot_command "runm\"fbs\n"
 
