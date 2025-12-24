@@ -9,9 +9,17 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <stdio.h>
+#ifdef __APPLE2__
+#include <peekpoke.h>
+#endif
+
 InputStruct input;
 uint8_t _lastJoy, _joy, _joySameCount = 10;
 bool _buttonReleased = true;
+#ifdef __APPLE2__
+uint8_t _lastKey = 0;  // Track last key pressed to prevent repeated input (Apple II only)
+#endif
 
 #ifndef JOY_BTN_2_MASK
 #define JOY_BTN_2_MASK JOY_BTN_1_MASK
@@ -26,6 +34,9 @@ void pause(uint8_t frames)
 void clearCommonInput()
 {
     input.trigger = input.key = input.dirY = input.dirX = _lastJoy = _joy = _buttonReleased = 0;
+#ifdef __APPLE2__
+    _lastKey = 0;
+#endif
     while (kbhit())
         cgetc();
 }
@@ -86,9 +97,30 @@ void readCommonInput()
     }
 
     if (!kbhit())
+    {
+#ifdef __APPLE2__
+        // No key pressed, reset last key (Apple II only)
+        _lastKey = 0;
+#endif
         return;
+    }
 
     input.key = cgetc();
+    
+#ifdef __APPLE2__
+    // Only process if this is a different key than last time (Apple II only)
+    // This prevents the same key from being processed multiple times
+    // But allow processing if last key was 0 (no key was pressed before)
+    if (input.key == _lastKey && _lastKey != 0)
+    {
+        // Same key as last time, ignore it
+        input.key = 0;
+        return;
+    }
+    
+    // New key pressed, save it
+    _lastKey = input.key;
+#endif
 
     switch (input.key)
     {

@@ -15,7 +15,7 @@
 
 PRODUCT = fbs
 PRODUCT_UPPER = FBS
-PLATFORMS = coco msdos atari
+PLATFORMS = coco msdos atari apple2
 
 #PLATFORMS = coco apple2 atari c64 adam msdos msxrom # TODO
 
@@ -24,9 +24,9 @@ PLATFORMS = coco msdos atari
 SRC_DIRS = src src/%PLATFORM%
 
 # FUJINET_LIB - specify version such as 4.7.6, or leave empty for latest
-FUJINET_LIB =
+FUJINET_LIB = 
 
-#################################################################
+
 ## Compiler / Linker flags                                     ##
 #################################################################
 
@@ -54,6 +54,9 @@ COCO_DISK = $(R2R_PRODUCT).dsk
 coco3:
 	make coco MAKE_COCO3=COCO3
 
+# Apple II specific flags (cc65)
+CFLAGS_EXTRA_APPLE2 += -Os -D__APPLE2__
+LDFLAGS_EXTRA_APPLE2 += --start-addr 0x4000 --ld-args -D,__HIMEM__=0xBF00
 #################################################################
 ## PRE BUILD STEPS                                             ##
 #################################################################

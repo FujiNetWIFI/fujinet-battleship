@@ -114,7 +114,11 @@ void welcomeActionVerifyServerDetails()
 void drawLogo()
 {
     drawBox(WIDTH / 2 - 8, 0, 15, 1);
+#ifdef __APPLE2__
+    drawText(WIDTH / 2 - 7, 2, "FUJI battleship");
+#else
     drawTextAlt(WIDTH / 2 - 7, 1, "FUJI battleship");
+#endif
 }
 
 void showPlayerNameScreen()
@@ -187,7 +191,6 @@ void showWelcomeScreen()
 #define TWID 26
 #define RMAR (WIDTH / 2 + TWID / 2)
 #define LMAR (WIDTH / 2 - TWID / 2)
-
 /// @brief Shows a screen to select a table to join
 void showTableSelectionScreen()
 {
