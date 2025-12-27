@@ -13,6 +13,9 @@
 uint16_t ii;
 
 void tone(uint16_t period, uint8_t dur, uint8_t wait) {
+  if (prefs.disableSound)
+    return;
+    
   while (dur--) {
     for (ii=0; ii<period; ii++) ;
     CLICK;
@@ -105,14 +108,14 @@ void soundHit()
 {
     uint8_t i;
 
-    // 最初に強めの一発「ドン」
-    tone(24, 25, 8);       // 高めの短いアタック
+    // Start with a strong attack sound
+    tone(24, 25, 8);       // High-pitched short attack
 
-    // 続けて、やや長めの下降スイープ「ドゥーン」
-    for (i = 0; i < 10; ++i)
+    // Follow with a longer descending sweep
+    for (i = 0; i < 25; ++i)
     {
-        // period を増やしていくことで徐々に低くする
-        uint16_t period = 40 + i * 5;   // 40 → 85 くらい
+        // Gradually lower the pitch by increasing period
+        uint16_t period = 40 + i * 5;   // approximately 40 → 85
         tone(period, 3, 0);
     }
 }
@@ -120,11 +123,13 @@ void soundHit()
 #define SPEAKER ((volatile uint8_t*)0xC030)
 void soundMiss()
 {
-    uint8_t burst, i;
-    uint8_t d;
+  uint8_t burst, i;
+  uint8_t d;
+  if (prefs.disableSound)
+      return;
 
     // short noise burst
-    for (burst = 0; burst < 4; ++burst)
+    for (burst = 0; burst < 3; ++burst)
     {
         for (i = 0; i < 25; ++i)
         {
@@ -137,7 +142,7 @@ void soundMiss()
             }
         }
         // short silence between burst
-        for (i = 0; i < 30; ++i)
+        for (i = 0; i < 20; ++i)
         {
             d = 40;
             while (d--)

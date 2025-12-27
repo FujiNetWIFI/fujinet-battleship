@@ -25,10 +25,7 @@
 #define ROP_WRITE_RIGHT_HALF ROP_CONST(0b11110000) 
 #define ROP_WRITE_LEFT_HALF ROP_CONST(0b1000011) 
 #define SCREEN_WIDTH 40
-//#define RED_VAL_2 ROP_OR(0b11010101)
-//#define RED_VAL_1 ROP_OR(0b10101010)
 
-//int loadfont(void);
 int identify(void); 
 void setVsyncProc(int type); 
 unsigned char colorMode=0;
@@ -43,18 +40,72 @@ uint16_t quadrant_offset[] = {
   10 * 40 + 5,    // = 405   (Player 1: top-left, x=5, y=10)
   10 * 40 + 17,   // = 417   (Player 2: top-right, x=17, y=10)
   98 * 40 + 17};  // = 3937  (Player 3: bottom-right, x=17, y=98)
-/*
-uint16_t quadrant_offset[] = {
-  256U * 12 + 5 + 64,
-  256U * 1 + 5 + 64,
-  256U * 1 + 17 + 64,
-  256U * 12 + 17 + 64};
-*/
 
  uint16_t legendShipOffset[] = {2, 1, 0, 256U * 5, 256U * 6 + 1}; 
 extern unsigned char charset[];
 #define OFFSET_Y 2
 static uint16_t currentPlayerCount = 0;
+
+// Drawer border font data (8 bytes × 8 types = 64 bytes)
+// Each character is 7 pixels wide × 8 lines high
+// Pattern definitions:
+// - Top half black / bottom half blue: for horizontal borders
+// - Right half black / left half blue: for vertical borders (left side)
+// - Left half blue / right half black: for vertical borders (right side)
+static const uint8_t drawerBorderFont[8][8] = {
+    // 0: Top half black / bottom half blue (EVEN)
+    {0x00, 0x00, 0x00, 0x00, 0xd5, 0xd5, 0xd5, 0xd5},
+    // 1: Top half black / bottom half blue (ODD)
+    {0x00, 0x00, 0x00, 0x00, 0xaa, 0xAA, 0xAA, 0xAA},
+    // 2: Top half blue / bottom half black (EVEN)
+    {0xd5, 0xd5, 0xd5, 0xd5, 0x00, 0x00, 0x00, 0x00},
+    // 3: Top half blue / bottom half black (ODD)
+    {0xAA, 0xAA, 0xAA, 0xaa, 0x00, 0x00, 0x00, 0x00},
+    // 4: Right half black / left half blue (EVEN)
+    {0x8A, 0x8A, 0x8A, 0x8A, 0x8A, 0x8A, 0x8A, 0x8A},
+    // 5: Right half black / left half blue (ODD)
+    {0xd0, 0xd0, 0xd0, 0xd0, 0xd0, 0xd0, 0xd0, 0xd0},
+    // 6: Left half blue / right half black (EVEN)
+    {0xD0, 0xD0, 0xD0, 0xD0, 0xD0, 0xD0, 0xD0, 0xD0},
+    // 7: Left half blue / right half black (ODD)
+    {0xA8, 0xA8, 0xA8, 0xA8, 0xA8, 0xA8, 0xA8, 0xA8}
+};
+#define V_LINE_LEFT   0x07
+#define V_LINE_RIGHT  0xf0
+
+// Green line font data for active player name underline (1 byte per pattern)
+static const uint8_t greenLineFont[2] = {
+    0x2a,  // EVEN: green pattern
+    0x55   // ODD: green pattern
+};
+
+// Helper function to draw drawer border
+// type: 0=top black/bottom blue, 1=top blue/bottom black, 2=right black/left blue, 3=left blue/right black
+// length: number of characters to draw
+static void drawDrawerBorder(uint8_t x, uint8_t y, uint8_t type, uint8_t length)
+{
+    uint8_t fontIndex;
+    uint8_t i;
+    
+    for (i = 0; i < length; i++) {
+        uint8_t actualX = x + i;
+        // Select font based on actual x coordinate (ODD/EVEN) and type
+        if (type < 2) {
+            // Horizontal borders (top/bottom)
+            fontIndex = (actualX % 2) ? (type * 2 + 1) : (type * 2);
+        } else {
+          if (type == 2) {
+            fontIndex = 4;
+          }
+          else {
+            // Vertical borders (left/right)
+            //fontIndex = (actualX % 2) ? ((type - 2) * 2 + 1 + 4) : ((type - 2) * 2 + 4);
+            fontIndex = 6;
+          }
+        }
+        hires_Draw(actualX, y, 1, 8, ROP_CPY_NOFLIP, (char*)&drawerBorderFont[fontIndex][0]);
+    }
+}
 
 unsigned char cycleNextColor() {
   ++colorMode;
@@ -106,32 +157,20 @@ void drawBox(unsigned char x, unsigned char y, unsigned char w, unsigned char h)
   if (y == 0) {
     y = 1;
   }
-
   y=y*8-4;
-
   // Top Corners
   hires_putc(x,y,ROP_CPY, 0x3b);hires_putc(x+w+1,y,ROP_CPY, 0x3c);
-  
-  /*
-  // Accents if height > 1
-  if (h>1) {
-    hires_putc(x+1,y+8,ROP_CPY, 1);
-  }
-    */
-
   // Top/bottom lines
   for(i=x+w;i>x;--i) {
     hires_putc(i,y,ROP_CPY, 0x40);
     hires_putc(i,y+(h+1)*8,ROP_CPY, 0x40);
   }
-  
   // Sides
   for(i=0;i<h;++i) {
     y+=8;
     hires_putc(x,y,ROP_CPY, 0x3f);
     hires_putc(x+w+1,y,ROP_CPY, 0x3f);
   }
-
   y+=8;
   // Bottom Corners
   hires_putc(x,y,ROP_CPY, 0x3d);hires_putc(x+w+1,y,ROP_CPY, 0x3e);
@@ -145,17 +184,6 @@ void initGraphics() {
   int type;
  // uint16_t c=0x900;
   bool use=false;
- /* 
-//  int status;
-
- // status = loadfont();
- // if (status == -1) {
-//    printf("load font error\n");
-  }
-  //else {
-//    printf("load success\n");
-//  }
-*/
     
   hires_Init();
   hires_Clear();
@@ -167,21 +195,13 @@ void initGraphics() {
   setVsyncProc(type);
 }
 
-
-//-------------------------------------------------------------------------------------------
-// from proto
 void drawTextAltAt(uint8_t x, uint8_t y, const char *s) {
   if (y == HEIGHT - 1) {
-    // 最下行
     uint8_t len = (uint8_t)strlen(s);
 
-    // ---- ここがポイント ----
-    // x が右端近く（タイマー領域）なら、
-    // 左側をクリアしないでそのまま描画する
-    if (x >= WIDTH - 5) {   // 目安: x >= 35 あたり（WIDTH=40, TIMER_WIDTH=1 なら 37 付近）
+    if (x >= WIDTH - 5) {
       drawTextAt(x, y * 8, s);
     } else {
-      // 従来通り：ステータス文字列などは行の前後をクリア
       if (x > 0) {
         drawSpace(0, y, x);
     }
@@ -198,8 +218,6 @@ void drawTextAltAt(uint8_t x, uint8_t y, const char *s) {
 void drawTextAlt(uint8_t x, uint8_t y, const char *s)
 {
   uint8_t len;
-  uint8_t clearStart;
-  uint8_t clearEnd;
 
   if (y == HEIGHT - 1) {
     // Clear before and after text when drawing on the bottom line
@@ -222,7 +240,13 @@ void drawTextAlt(uint8_t x, uint8_t y, const char *s)
 
 void drawIcon(uint8_t x, uint8_t y, uint8_t icon)
 {
+  if (icon == ICON_PLAYER) {
+    hires_putc(x, y * 8 - 4, ROP_CPY_NOFLIP, icon);
+  }
+  else 
+  {
     hires_putc(x, y * 8 - 4, ROP_CPY, icon);
+  }
 }
 
 void drawShip(uint8_t size, uint8_t pos, bool hide)
@@ -362,6 +386,8 @@ void drawPlayerName(uint8_t player, const char *name, bool active)
   uint8_t x;
   uint8_t y;
   uint8_t nameLen = strlen(name);
+  uint8_t gx;
+  uint8_t lineY;
 
   
     pos = fieldX + quadrant_offset[player];
@@ -372,18 +398,33 @@ void drawPlayerName(uint8_t player, const char *name, bool active)
       y += 89;
   }
 
+  lineY = y + 8;
+
   if (active)
   {
-     
-      //hires_Mask(x - 1, y, nameLen + 1, 8, ROP_WHITE);
       // Draw marker and text
       hires_putc(x - 1, y, ROP_CPY_NOFLIP, ICON_ACTIVE_PLAYER);
       drawTextAt(x, y, name);
+      
+      // Draw green horizontal line at bottom of player name row (10 columns, 1 pixel thick)
+      // Use hires_Draw with ROP_CPY_NOFLIP to get green/violet palette
+      // Draw only 1 line (ysize=1) at lineY position
+      for (gx = 0; gx < 10; gx++) {
+          uint8_t actualX = x - 1 + gx;  // Start from x - 1 to cover 10 columns including icon
+          uint8_t fontIndex = (actualX % 2);  // 0 for EVEN, 1 for ODD
+          hires_Draw(actualX, lineY, 1, 1, ROP_CPY_NOFLIP, (char*)&greenLineFont[fontIndex]);
+      }
   }
   else
   {
-      hires_putc(x - 1, y, ROP_CPY, 0x20);  // Changed from 0x62 to 0x20 (space character)
+      hires_putc(x - 1, y, ROP_CPY, 0x20);
       drawTextAt(x, y, name);  // Draw player name
+      
+      // Erase green line by drawing black (10 columns, 1 pixel thick)
+      for (gx = 0; gx < 10; gx++) {
+          uint8_t actualX = x - 1 + gx;
+          hires_Mask(actualX, lineY, 1, 1, ROP_BLACK);
+      }
   }
 }
 
@@ -568,13 +609,12 @@ void drawSpace(uint8_t x, uint8_t y, uint8_t w) {
 
 void drawBoard(uint8_t playerCount)
 {
-    uint8_t i, x, y, ix, ox, left = 1, fy, eh, drawEdge, drawCorner, edgeSkip;
+    uint8_t i, x, y, ix, ox, left = 1, fy, eh, edgeSkip;
     uint8_t drawX;  // x start position of drawer
     uint8_t gx;
-
     uint16_t pos;
     // Center layout
-    fieldX = playerCount > 2 ? 0 : 10;
+    fieldX = playerCount > 2 ? 4 : 10;
     currentPlayerCount = playerCount;
     for (i = 0; i < playerCount; i++)
     {
@@ -589,76 +629,24 @@ void drawBoard(uint8_t playerCount)
             ix = x + 10;
             left = 0;
             drawX = ix + 1; 
-            //drawEdge = drawX + 3; // This line was commented out
-            //drawCorner = 0xd; // This line was commented out
         }
         else
         {
             ix = x - 1;
             ox = x + 10;
             drawX = ix - 3;
-            //drawEdge = drawX - 1; // This line was commented out
-            //drawCorner = 0xc; // This line was commented out
         }
         if (i == 1 || i == 2)
         {
           if (y - 9 < 0 || y - 9 >= 192) return;  // or skip
           if (y + 80 >= 192) return;  // or skip
           if (y + 82 >= 192) return;  // or skip
-            // Name badge corners
-//            hires_putc(x - 1, y - 8, ROP_CPY, 0x5C);
-//x            hires_putc(x + 10, y - 8, ROP_CPY, 0x5D);
-
-            // Name badge
-            // Fill
-            //hires_Mask(x, y - 9, 10, 9, ROP_YELLOW);
-//            hires_Mask(x, y - 9, 10, 9, ROP_CONST(0xff));
-//            hires_Mask(x, y + 80, 10, 2, 0xa9ff);             // h-line
-
-            // Border
-            //hires_Mask(x, y - 10, 10, 1, ROP_BLUE); top most horizontal 
-            //hires_Mask(x - 1, y - 10, 1, 1, ROP_CONST(0b00000010));
-
-            //hires_Mask(x + 10, y - 10, 1, 1, ROP_CONST(0b10000000));
-            //hires_Mask(x - 1, y - 9, 1, 1, ROP_CONST(0b001001));
-            //hires_Mask(x + 10, y - 9, 1, 1, ROP_CONST(0b01100000));
-//            hires_Mask(x - 1, y, 1, 80 + 2, ROP_WRITE_RIGHT_HALF);
-//            hires_Mask(x + 10, y, 1, 80 + 2, ROP_CONST(0b10000111));
             fy = y + 80;
         }
         else
         {
-            // Name badge corners
-
-//            hires_putc(x - 1, y + 80, ROP_CPY, 0x5E);
-//            hires_putc(x + 10, y + 80, ROP_CPY, 0x5F);
-
-            // Name fill
-            //hires_Mask(x, y + 80, 10, 9, ROP_YELLOW);
-//            hires_Mask(x, y + 80, 10, 9, ROP_CONST(0xff));
-
-            // Border
-            //hires_Mask(x - 1, y + 88, 1, 1, ROP_CONST(0b001001));
-            //hires_Mask(x + 10, y + 88, 1, 1, ROP_CONST(0b01100000));
-
-            //hires_Mask(x, y + 89, 10, 1, ROP_BLUE);
-            //hires_Mask(x - 1, y + 89, 1, 1, ROP_CONST(0b00000010));
-            //hires_Mask(x + 10, y + 89, 1, 1, ROP_CONST(0b10000000));
-            //hires_Mask(x - 1, y+89, 1, 80, ROP_WRITE_RIGHT_HALF);
-            //hires_Mask(x + 10, y+89, 1, 80, ROP_CONST(0b10000111));
-
             fy = y - 8;
         }
-        // Outside edge
-        //hires_Draw(ox, y, 1, 80, ROP_CPY, charset[(uint16_t)(left ? 0x23 : 0x22) << 3]);
-
-        // Inner edge (adjacent to ships drawer)
-        //hires_Draw(ix, y + 8, 1, 64, ROP_CPY, charset[(uint16_t)(left ? 0x01 : 0x04) << 3]);
-
-        // Inner edge + ship drawer
-        //hires_putc(ix, y, ROP_CPY, left ? 0x24 : 0x25);
-        //hires_putc(ix, y + 72, ROP_CPY, left ? 0x24 : 0x25);
-
         // Blue gamefield
         for (gx=0; gx < 10; gx++) {
           hires_Mask(x+gx, y, 1, 80, ((x+gx) % 2 ) ? ROP_YELLOW : ROP_BLUE);
@@ -676,24 +664,107 @@ void drawBoard(uint8_t playerCount)
                 eh = 8;
             else
                 eh = 3;
-
-            //hires_Draw(x - 1, fy, 1, eh, ROP_CPY, charset[(uint16_t)0x02 << 3] + edgeSkip);
-            //hires_Draw(x + 10, fy, 1, eh, ROP_CPY, charset[(uint16_t)0x03 << 3] + edgeSkip);
-            //hires_Draw(x, fy, 10, eh, ROP_CPY, charset[(uint16_t)0x29 << 3] + edgeSkip);
         }
-
-        // Ship drawer edges
-        //hires_Draw(drawX, y, 3, 8, ROP_CPY, charset[(uint16_t)0x11 << 3]);
-        //hires_Draw(drawX, y + 72, 3, 8, ROP_CPY, charset[(uint16_t)0x11 << 3]);
-        //hires_Draw(drawEdge, y + 8, 1, 64, ROP_CPY, charset[(uint16_t)0x10 << 3]);
-        //hires_putc(drawEdge, y, ROP_CPY, drawCorner);
-        //hires_putc(drawEdge, y + 72, ROP_CPY, drawCorner + 2);
-
         // Fill in the drawer
-       // hires_Mask(drawX, y + 8, 3, 64, ROP_BLUE);
         for (gx=0; gx < 3; gx++) {
           hires_Mask(drawX+gx, y+8, 1, 64, ((drawX+gx) % 2 ) ? ROP_YELLOW : ROP_BLUE);
-          //hires_Mask(drawX+gx, y, 1, 80, ((drawX+gx) % 2 ) ? ODD_BLUE : EVEN_BLUE);
+        }
+        // Draw drawer borders
+        // Top border (3 characters wide, starting at y, above drawer)
+        drawDrawerBorder(drawX, y, 0, 3);
+        
+        // Bottom border (3 characters wide, at y+8+64)
+        drawDrawerBorder(drawX, y + 8 + 64, 1, 3);
+        
+        // Vertical borders (9 lines high to cover y+4 to y+4+64)
+        if (i > 1 || playerCount == 2 && i > 0) {
+            // Right drawer: right border (outer side, away from game field)
+            for (gx = 0; gx < 9; gx++) { 
+                drawDrawerBorder(drawX + 3, y + 4 + gx * 8, 2, 1);
+            }
+        } else {
+            // Left drawer: left border (outer side, away from game field)
+            for (gx = 0; gx < 9; gx++) {
+                drawDrawerBorder(drawX - 1, y + 4 + gx * 8, 3, 1);
+            }
+        }
+        // Draw white outline outside drawer borders
+        if (i > 1 || playerCount == 2 && i > 0) {
+            // Right drawer
+            // Top white line (1 pixel thick, above drawer top border, 4 columns wide)
+            hires_Mask(drawX, y + 3, 4, 1, ROP_WHITE);
+            
+            // Bottom white line (1 pixel thick, below drawer bottom border, 4 columns wide)
+            hires_Mask(drawX, y + 8 + 68, 4, 1, ROP_WHITE);
+            
+            // Right side white line (leftmost bit of column = screen right)
+            // Use ROP_OR to preserve drawer border drawing
+            for (gx = 0; gx < 9; gx++) {
+                hires_Mask(drawX + 3, y + 4 + gx * 8, 1, 8, ROP_OR(V_LINE_RIGHT));
+            }
+        } else {
+            // Left drawer
+            // Top white line (1 pixel thick, above drawer top border, 4 columns wide)
+            // x position: 4 pixels left (adjust by using drawX - 1 for partial column offset)
+            hires_Mask(drawX - 1, y + 3, 4, 1, ROP_WHITE);
+            
+            // Bottom white line (1 pixel thick, below drawer bottom border, 4 columns wide)
+            // x position: 4 pixels left
+            hires_Mask(drawX - 1, y + 8 + 68, 4, 1, ROP_WHITE);
+            
+            // Left side white line (rightmost bit of column = screen left)
+            // Use ROP_OR to preserve drawer border drawing
+            for (gx = 0; gx < 9; gx++) {
+                hires_Mask(drawX - 1, y + 4 + gx * 8, 1, 8, ROP_OR(V_LINE_LEFT));
+            }
+        }
+        
+        // Draw white lines inside game field
+        // Horizontal line (opposite side of player name)
+        if (i == 1 || i == 2) {
+            // Top players: draw at bottom of game field
+            hires_Mask(x, y + 80, 10, 1, ROP_WHITE);
+        } else {
+            // Bottom players: draw at top of game field
+            hires_Mask(x, y - 1, 10, 1, ROP_WHITE);
+        }
+        
+        // Vertical line (opposite side of drawer)
+        // Use ROP_OR to preserve game field drawing
+        if (i > 1 || playerCount == 2 && i > 0) {
+            // Right players: draw at left edge of game field
+            if (i == 1 || i == 2) {
+                // Top players: extend line 1 line down at the end
+                for (gx = 0; gx < 10; gx++) {
+                    hires_Mask(x - 1, y + gx * 8, 1, 8, ROP_OR(V_LINE_RIGHT));
+                }
+                // Add 1 line at the bottom
+                hires_Mask(x - 1, y + 80, 1, 1, ROP_OR(V_LINE_RIGHT));
+            } else {
+                // Bottom players: start 1 line up
+                // Add 1 line at the top
+                hires_Mask(x - 1, y - 1, 1, 1, ROP_OR(V_LINE_RIGHT));
+                for (gx = 0; gx < 10; gx++) {
+                    hires_Mask(x - 1, y + gx * 8, 1, 8, ROP_OR(V_LINE_RIGHT));
+                }
+            }
+        } else {
+            // Left players: draw at right edge of game field
+            if (i == 1 || i == 2) {
+                // Top players: extend line 1 line down at the end
+                for (gx = 0; gx < 10; gx++) {
+                    hires_Mask(x + 10, y + gx * 8, 1, 8, ROP_OR(V_LINE_LEFT));
+                }
+                // Add 1 line at the bottom
+                hires_Mask(x + 10, y + 80, 1, 1, ROP_OR(V_LINE_LEFT));
+            } else {
+                // Bottom players: start 1 line up
+                // Add 1 line at the top
+                hires_Mask(x + 10, y - 1, 1, 1, ROP_OR(V_LINE_LEFT));
+                for (gx = 0; gx < 10; gx++) {
+                    hires_Mask(x + 10, y + gx * 8, 1, 8, ROP_OR(V_LINE_LEFT));
+                }
+            }
         }
     }
 }
