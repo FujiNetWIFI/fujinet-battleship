@@ -226,6 +226,7 @@ bool isPCjr(void)
  */
 void initGraphics()
 {
+    struct dostime_t tm;
     union REGS r;
 
     // Get old mode
@@ -276,6 +277,10 @@ void initGraphics()
     r.h.bl = 3;
     r.h.bh = 0x0f; // WHITE
     int86(0x10,&r,&r);
+
+    // randomize timer seed
+    _dos_gettime(&tm);
+    srand(60U * tm.minute + tm.second);
 }
 
 /**
@@ -414,7 +419,7 @@ void drawConnectionIcon(bool show)
     else
     {
         drawIcon(0, HEIGHT-1, 0x00);
-        drawIcon(0, HEIGHT-1, 0x00);
+        drawIcon(1, HEIGHT-1, 0x00);
     }
 }
 
@@ -669,7 +674,7 @@ void drawShipInternal(unsigned char x, unsigned char y, unsigned char size, unsi
  * @param pos Grid position (0-99)
  * @param hide make invisible?
  */
-void drawShip(unsigned char size, unsigned char pos, bool hide)
+void drawShip(unsigned char quadrant, unsigned char size, unsigned char pos, bool hide)
 {
     uint8_t i = 0, delta = 0;
     uint8_t x = 0, y = 0;
@@ -683,8 +688,8 @@ void drawShip(unsigned char size, unsigned char pos, bool hide)
     x = pos % 10;
     y = pos / 10;
 
-    x += fieldX + quadrant_offset[0][0];
-    y += quadrant_offset[0][1];
+    x += fieldX + quadrant_offset[quadrant][0];
+    y += quadrant_offset[quadrant][1];
 
     if (hide)
     {
@@ -757,7 +762,7 @@ void drawLegendShip(uint8_t player, uint8_t index, uint8_t size, uint8_t status)
 void drawGamefield(uint8_t quadrant, uint8_t *field)
 {
     uint8_t ix=0, iy=0;
-    uint8_t x = quadrant_offset[quadrant][0];
+    uint8_t x = quadrant_offset[quadrant][0] + fieldX;
     uint8_t y = quadrant_offset[quadrant][1];
 
     for (iy=0;iy<10;iy++)
@@ -856,9 +861,9 @@ void drawEndgameMessage(const char *message)
     x = WIDTH / 2 - i / 2;
 
     for (ix=0;ix<WIDTH;ix++)
-        drawIcon(ix, WIDTH-2, 0xE2);
-    for (ix=0;ix<WIDTH;ix++)
-        drawIcon(ix, WIDTH-1, 0x40);
+        drawIcon(ix, HEIGHT-2, 0xE2);
+
+    drawSpace(0, HEIGHT-1,WIDTH);  
     drawText(x,HEIGHT-1,message);
 }
 

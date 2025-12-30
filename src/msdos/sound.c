@@ -51,7 +51,7 @@ void beep(unsigned int frequency, unsigned int frames, unsigned int wait) {
         // Wait until vblank starts
         while(!(inp(0x3DA) & 0x08));
         // Wait until vblank stops
-	while(inp(0x3DA) & 0x08);
+	    while(inp(0x3DA) & 0x08);
     }
 
     // Turn off the speaker (clear bit 0, keep bit 1 for PIT gate)
@@ -79,9 +79,6 @@ void soundJoinGame()
     beep(500,5,0);
 }
 
-void soundFujitzee()
-{
-}
 
 void soundMyTurn()
 {
@@ -120,24 +117,28 @@ void soundSelect()
 
 void soundMiss()
 {
+    beep(150, 0, 1);
+    beep(170, 1, 0);
 }
 
 void soundInvalid()
 {
+    beep(150, 2, 2);
+    beep(150, 2, 0);
 }
 
 void soundAttack()
 {
     uint8_t i;
-    for (i=80;i>=50;i-=10)
-        beep(i,2,15);
+    for (i = 80; i >= 50; i -= 10)
+        beep(i, 2, 0);
 }
 
 void soundHit()
 {
     uint8_t i;
-    for (i=50;i<=80;i+=10)
-        beep(i,2,15);
+    for (i = 50; i <= 80; i += 10)
+        beep(i, 2, 1);
 }
 
 // Not applicable to CoCo

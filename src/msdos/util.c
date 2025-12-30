@@ -12,19 +12,17 @@
 HostSlot host_slots[FUJI_HOST_SLOT_COUNT];
 DeviceSlot device_slots[FUJI_DEVICE_SLOT_COUNT];
 
+static uint16_t timer;
+
 void resetTimer()
 {
+    timer = 0;
 }
 
 uint16_t getTime()
 {
-    return 0;
-}
-
-/// @brief Invokes the CoCo BASIC RUNM command
-/// @param filename
-void runm(char *filename)
-{
+    timer++;
+    return timer;
 }
 
 void mount()
@@ -39,7 +37,7 @@ void quit()
 
 void housekeeping()
 {
-    // Not needed on CoCo
+    // Not needed on msdos
 }
 
 uint8_t getJiffiesPerSecond()
@@ -49,5 +47,5 @@ uint8_t getJiffiesPerSecond()
 
 uint8_t getRandomNumber(uint8_t maxExclusive)
 {
-    return 0;
+    return rand() % 255;
 }
