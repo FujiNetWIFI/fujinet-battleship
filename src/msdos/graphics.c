@@ -1,0 +1,850 @@
+/*
+  Graphics functionality
+*/
+#include <i86.h>
+#include <dos.h>
+#include <stdint.h>
+#include <string.h>
+#include <stdbool.h>
+#include <conio.h>
+#include "vars.h"
+#include "../platform-specific/graphics.h"
+#include "../platform-specific/sound.h"
+#include "../misc.h"
+#include <stdio.h>
+
+/* Based on the atari graphics.c */
+
+/**
+ * @brief extern pointing to character set arrays
+ */
+extern unsigned char charset[256][16];
+extern unsigned char ascii[256][16];
+
+/**
+ * @brief used to offset tiles in the upper screen on the game board screen.
+ * This is to make few rows available for the name border at the top.
+ */
+unsigned char tile_offset = 0;
+
+/**
+ * @brief pointer to the B800 video segment for CGA
+ */
+#define VIDEO_RAM_ADDR ((unsigned char far *)0xB8000000UL)
+unsigned char far *video = VIDEO_RAM_ADDR;
+
+/**
+ * @brief stride size (# of bytes per line)
+ */
+#define VIDEO_LINE_BYTES 80
+
+/**
+ * @brief offset in video segment for odd lines
+ */
+#define VIDEO_ODD_OFFSET 0x2000
+
+/**
+ * @brief previous video mode
+ */
+unsigned char prevVideoMode;
+
+/**
+ * @brief Top left of each playfield quadrant
+ */
+static unsigned char quadrant_offset[4][2] =
+    {
+        {8,13}, // bottom left
+        {8,1},  // Top left
+        {21,1}, // top right
+        {21,13} // bottom right
+    };
+
+
+/**
+ * @brief offset of legends for each player
+ */
+signed char legendShipOffset[5][2] =
+    {
+        {2,0},
+        {1,0},
+        {0,0},
+        {0,5},
+        {1,6},
+    };
+    // {2, 1, 0, 40 * 5, 40 * 6 + 1};
+
+/**
+ * @brief Horizontal Field offset (0-39)
+ */
+unsigned char fieldX = 0;
+
+/**
+ * @brief Number of active players (0-3)
+ */
+static unsigned char playerCount = 0;
+
+/**
+ * #brief not sure why this is here
+ */
+static unsigned char inGameCharSet = 0;
+
+/**
+ * @brief Flag to indicate cursor visibility
+ */
+static bool cursorVisible = false;
+
+/**
+ * @brief plot a 8x8 2bpp tile to screen at column x, row y
+ * @param tile ptr to 2bpp tile data * 8
+ * @param x Column 0-39
+ * @param y Row 0-24
+ */
+void plot_tile(const unsigned char *tile, unsigned char x, unsigned char y)
+{
+    unsigned char i=0;
+
+    if (y<25) {
+        y <<= 3; // Convert row to line
+
+        // Shift the top tiles down if in gameboard mode
+        if (y<96)
+            y+=tile_offset;
+    }
+
+    x <<= 1; // Convert column to video ram offset
+
+    for (i=0;i<8;i++)
+    {
+        unsigned char r = y + i;
+        unsigned char rh = r >> 1; // Because CGA is interleaved odd/even.
+        unsigned short ro = rh * VIDEO_LINE_BYTES + x;
+
+        // If row is odd, go into second bank.
+        if (r & 1)
+            ro += VIDEO_ODD_OFFSET;
+
+        // Put tile data into video RAM.
+        video[ro] = tile[i*2];
+        video[ro+1] = tile[i*2+1];
+    }
+}
+
+/**
+ * @brief plot char, in given color/inverse
+ * @param x Horizontal position (0-39)
+ * @param y Vertical position (0-24)
+ * @param c Color (0-3)
+ * @param i Inverse? (0-1)
+ * @param s Pointer to null terminated string
+ */
+void plot_char(unsigned char x,
+               unsigned char y,
+               unsigned char color,
+               unsigned char xor,
+               char c)
+{
+    unsigned char tile[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+    unsigned char mask = 0xFF;
+    unsigned char i=0;
+
+    // Optimization to just call plot_tile directly
+    // If we're just doing white on color 0.
+    if (i==0 && color == 3)
+    {
+        plot_tile(ascii[c], x, y);
+        return;
+    }
+
+    switch(color)
+    {
+    case 0:
+        mask = 0x00;
+        break;
+    case 1:
+        mask = 0x55;
+        break;
+    case 2:
+        mask = 0xAA;
+        break;
+    case 3:
+        mask = 0xFF;
+    }
+
+    for (i=0;i<sizeof(tile);i++)
+    {
+        if (xor)
+            tile[i] = ascii[c][i] ^ 0xFF & mask;
+        else
+            tile[i] = ascii[c][i] & mask;
+    }
+
+    plot_tile(&tile[0], x, y);
+}
+
+/**
+ * @brief plot name text inverse
+ * @param x Horizontal position (0-39)
+ * @param y Vertical position (0-24)
+ * @param color Color to plot (0-3)
+ * @param s Pointer to name string
+ */
+void plotName(unsigned char x, unsigned char y, unsigned char color, const char *s)
+{
+    char c=0;
+
+    while (c = *s++)
+    {
+        plot_char(x++, y, color, 1, c);
+    }
+}
+
+/**
+ * @brief Clear screen to given color index
+ */
+void resetScreen(void)
+{
+    waitvsync();
+    _fmemset(&video[0x0000], 0, 8000);
+    _fmemset(&video[0x2000], 0, 8000);
+    waitvsync();
+    tile_offset=0;
+}
+
+/**
+ * @brief cycle to next color palette
+ */
+unsigned char cycleNextColor()
+{
+    return 0;
+}
+
+/**
+ * @brief Is PCjr?
+ * @return true = yes, false = no.
+ */
+bool isPCjr(void)
+{
+    union REGS r;
+
+    r.h.ah = 0xC0;
+    int86(0x15,&r,&r);
+
+    return (r.h.al == 0xFD); // 0xFD = PCjr
+}
+
+/**
+ * @brief Initialize Graphics mode
+ * @verbose 320x200x2bpp (4 colors, CGA)
+ */
+void initGraphics()
+{
+    struct dostime_t tm;
+    union REGS r;
+
+    // Get old mode
+    r.h.ah = 0x0f;
+    int86(0x10,&r,&r);
+
+    prevVideoMode=r.h.al;
+
+    // Set graphics mode
+    r.h.ah = 0x00;
+
+    if (isPCjr())
+        r.h.al = 0x04; // Choose color
+    else
+        r.h.al = 0x05; // choose "b&w" for alternate palette
+
+    int86(0x10,&r,&r);
+
+    // Set Background Color
+    r.h.ah = 0x0b;
+    r.h.bh = 0x00;
+    r.h.bl = 0x01; // Blue
+    int86(0x10,&r,&r);
+
+    if (!isPCjr())
+    {
+        // Set intensity bit for standard CGA card.
+        outp(0x3D9,0x31);
+    }
+
+    // remap palette
+    r.h.ah = 0x10;
+    r.h.al = 0x00;
+    r.h.bl = 1;
+    r.h.bh = 0x0b; // CYAN
+    int86(0x10,&r,&r);
+
+    // remap palette
+    r.h.ah = 0x10;
+    r.h.al = 0x00;
+    r.h.bl = 2;
+    r.h.bh = 0x0C; // RED
+    int86(0x10,&r,&r);
+
+    // remap palette
+    r.h.ah = 0x10;
+    r.h.al = 0x00;
+    r.h.bl = 3;
+    r.h.bh = 0x0f; // WHITE
+    int86(0x10,&r,&r);
+
+    // randomize timer seed
+    _dos_gettime(&tm);
+    srand(60U * tm.minute + tm.second);
+}
+
+/**
+ * @brief Reset to previous video mode
+ */
+void resetGraphics(void)
+{
+    union REGS r;
+
+    r.h.ah = 0x00;
+    r.h.al = prevVideoMode;
+    int86(0x10,&r,&r);
+}
+
+/**
+ * @brief Store screen buffer into secondary buffer
+ * @verbose not used.
+ */
+bool saveScreenBuffer()
+{
+    return false;
+    // memcpy(SCREEN_BAK, SCREEN_LOC, WIDTH * HEIGHT);
+}
+
+/**
+ * @brief Restore screen buffer from secondary buffer
+ * @verbose not used.
+ */
+void restoreScreenBuffer()
+{
+    // waitvsync();
+    // memcpy(SCREEN_LOC, SCREEN_BAK, WIDTH * HEIGHT);
+}
+
+/**
+ * @brief Text output
+ * @param x Column
+ * @param y Row
+ * @param s Text to output
+ */
+void drawText(unsigned char x, unsigned char y, const char *s)
+{
+    signed char c=0;
+    while (c = *s++)
+    {
+        if (x>39)
+        {
+            x=0;
+            y++;
+        }
+
+        plot_char(x++, y, 3, 0, c);
+    }
+}
+
+void drawTextAlt(unsigned char x, unsigned char y, const char *s)
+{
+    signed char c=0;
+    while (c = *s++)
+    {
+        if (c >= 'A' && c <= 'Z')
+        {
+            plot_char(x++, y, 2, 0, c);
+        }
+        else
+        {
+            plot_char(x++, y, 3, 0, c);
+        }
+    }
+}
+
+/**
+ * @brief Wait for vertical sync, no more than 1/60th of a second.
+ */
+void waitvsync()
+{
+    // Wait until we are in vsync
+    while (! (inp(0x3DA) & 0x08));
+    while (inp(0x3DA) & 0x08);
+}
+
+/**
+ * @brief draw icon
+ * @param x Horizontal position (0-39)
+ * @param y Vertical position (0-24)
+ * @param icon Character # (0-255)
+ */
+void drawIcon(unsigned char x, unsigned char y, unsigned char icon)
+{
+    plot_tile(&charset[icon], x, y);
+}
+
+/**
+ * @brief draw blank
+ * @param x Horizontal position (0-39)
+ * @param y Vertical position (0-24)
+ */
+void drawBlank(unsigned char x, unsigned char y)
+{
+    plot_tile(&charset[0x00], x, y);
+}
+
+/**
+ * @brief Draw a run of blanks
+ * @param x Horizontal Position (0-39)
+ * @param y Vertical position (0-24)
+ * @param w # of blank characters (0-39)
+ */
+void drawSpace(unsigned char x, unsigned char y, unsigned char w)
+{
+    while (w--)
+        drawBlank(x++,y);
+}
+
+/**
+ * @brief Draw the clock icon
+ */
+void drawClock(void)
+{
+    drawIcon(WIDTH-1, HEIGHT-1, 0x1d);
+}
+
+/**
+ * @brief Draw the network connection icon
+ */
+void drawConnectionIcon(bool show)
+{
+    if (show)
+    {
+        drawIcon(0, HEIGHT-1, 0x1E);
+        drawIcon(1, HEIGHT-1, 0x1F);
+    }
+    else
+    {
+        drawIcon(0, HEIGHT-1, 0x00);
+        drawIcon(1, HEIGHT-1, 0x00);
+    }
+}
+
+/**
+ * @brief Draw Player Name
+ * @param player Player # (0-3)
+ * @param name Pointer to player name
+ * @param active Is player active?
+ */
+void drawPlayerName(unsigned char player, const char *name, bool active)
+{
+    uint8_t x   = quadrant_offset[player][0]-1;
+    uint8_t y   = quadrant_offset[player][1]-1;
+    uint8_t add = active ? 0x00 : 0x80;
+    uint8_t i   = 0;
+
+    x += fieldX;
+
+    if (player == 0 || player == 3)
+    {
+        // Bottom player boards
+
+        // Thin horizontal border
+        drawIcon(x, y, 0x08 + add);
+        for(i=1;i<11;i++)
+        {
+            drawIcon(x+i, y, 0x27 + add);
+        }
+        drawIcon(x+11, y, 0x09 + add);
+
+        // Name label
+        drawIcon(x, y+11, 0x5E + add);
+        for(i=1;i<11;i++)
+        {
+            drawIcon(x+i, y+11, 0x60 + add);
+        }
+        drawIcon(x+11,y+11, 0x5F + add);
+        plotName(x+2,y+11, active ? 2 : 1, name);
+
+        // Active indicator
+        if (active)
+            drawIcon(x+1,y+11,0x5B);
+
+        // Bottom border below name label
+        drawIcon(x,y+12, 0x20 + add);
+        for(i=1;i<11;i++)
+        {
+            drawIcon(x+i,y+12,0x28 + add);
+        }
+        drawIcon(x+11,y+12,0x21 + add);
+    }
+    else
+    {
+        // Top player boards
+        
+        // top border ABOVE name label
+        // All top half of screen tiles are pushed down 2 rows
+        // to make room to draw the border 
+        _fmemset(&video[VIDEO_ODD_OFFSET+x*2+2],0xff,20);
+        video[VIDEO_ODD_OFFSET+x*2+1]=0x0f;
+        video[VIDEO_ODD_OFFSET+x*2+22]=0xf0;
+        
+        // Name label
+        drawIcon(x, y, 0x5C + add);
+        for(i=1;i<11;i++)
+        {
+            drawIcon(x+i, y, 0x60 + add);
+        }
+        drawIcon(x+11, y, 0x5D + add);
+        plotName(x+2, y, active ? 2 : 1, name); // set back to 1
+
+        // Active indicator
+        if (active)
+            drawIcon(x+1, y, 0x5B);
+
+        // Thin Horizontal Border
+        drawIcon(x, y+11, 0x0A + add);
+        for(i=1;i<11;i++)
+        {
+            drawIcon(x+i, y+11, 0x29 + add);
+        }
+        drawIcon(x+11, y+11, 0x0B + add);
+    }
+
+    // Draw left/right borders and drawers
+    if (player > 1 || playerCount == 2 && player > 0)
+    {
+        // Right drawer
+        // top
+        drawIcon(x+11,y+1,0x25 + add);
+        drawIcon(x+12,y+1,0x31 + add);
+        drawIcon(x+13,y+1,0x31 + add);
+        drawIcon(x+14,y+1,0x31 + add);
+        drawIcon(x+15,y+1,0x2D + add);
+        drawIcon(x,y+1,0x22 + add);
+
+        // Edges
+        for (i=0;i<8;i++)
+        {
+            drawIcon(x+11, y+2+i, 0x03 + add);
+            drawIcon(x+15, y+2+i, 0x02 + add);
+            drawIcon(x, y+2+i, 0x22 + add);
+        }
+
+        // bottom
+        drawIcon(x,y+10,0x22 + add);
+        drawIcon(x+11,y+10, 0x25 + add);
+        drawIcon(x+12,y+10, 0x31 + add);
+        drawIcon(x+13,y+10, 0x31 + add);
+        drawIcon(x+14, y+10, 0x31 + add);
+        drawIcon(x+15, y+10, 0x2F + add); // Left edge
+    }
+    else
+    {
+        // Left drawer
+        drawIcon(x-4,y+1,0x2C+add);
+        drawIcon(x-3,y+1,0x31+add);
+        drawIcon(x-2,y+1,0x31+add);
+        drawIcon(x-1,y+1,0x31+add);
+        drawIcon(x,y+1,0x24+add);
+        drawIcon(x+11,y+1,0x23 + add);
+
+        // Edges
+        for (i=0;i<8;i++)
+        {
+            drawIcon(x-4, y+2+i, 0x02 + add);
+            drawIcon(x, y+2+i, 0x02 + add);
+            drawIcon(x+11, y+2+i, 0x23 + add);
+        }
+
+        drawIcon(x-4,y+10,0x2E+add);
+        drawIcon(x-3,y+10,0x31+add);
+        drawIcon(x-2,y+10,0x31+add);
+        drawIcon(x-1,y+10,0x31+add);
+        drawIcon(x,y+10,0x24+add);
+        drawIcon(x+11,y+10,0x23+add); // Right edge
+    }
+    
+}
+
+/**
+ * @brief Draw the board
+ * @param currentPlayerCount The current # of players
+ */
+void drawBoard(unsigned char currentPlayerCount)
+{
+    int i=0;
+    tile_offset = 2;
+    playerCount = currentPlayerCount;
+
+    fieldX = playerCount > 2 ? 0 : 7;
+
+    for (i=0; i< playerCount; i++)
+    {
+        drawPlayerName(i, "", false);
+    }
+}
+
+/**
+ * @brief draw a horizontal line of w characters at x,y
+ * @param x Horizontal position (0-39)
+ * @param y Vertical position (0-24)
+ * @param w Width (0-39)
+ */
+void drawLine(unsigned char x, unsigned char y, unsigned char w)
+{
+    while (w--)
+        plot_tile(&charset[0x3F], x++, y);
+}
+
+/**
+ * @brief draw ship, shared between a few routines
+ * @param x Horizontal position (0-39)
+ * @param y Vertical position (0-24)
+ * @param size Size of ship (1-5)
+ * @param delta (0=horizontal 1-vertical)
+ */
+void drawShipInternal(unsigned char x, unsigned char y, unsigned char size, unsigned char delta)
+{
+    uint8_t i=0;
+    uint8_t c = delta ? 0x37 : 0x32; // Left segment of horizontal ship
+
+    if (delta)
+    {
+        // Vertical
+        drawIcon(x, y++, c--); // top
+
+        while (size>2) // middle
+        {
+            drawIcon(x, y++, c);
+            size--;
+        }
+
+        c--;                 // bottom
+        drawIcon(x, y++, c);
+    }
+    else
+    {
+        // Horizontal
+        drawIcon(x++, y, c++); // Left
+
+        while (size>2) // middle
+        {
+            drawIcon(x++, y, c);
+            size--;
+        }
+
+        c++;                  // Bottom
+        drawIcon(x++, y, c);
+    }
+}
+
+/**
+ * @brief Draw ship at position on sea
+ * @param size size of ship (1-5?)
+ * @param pos Grid position (0-99)
+ * @param hide make invisible?
+ */
+void drawShip(unsigned char quadrant, unsigned char size, unsigned char pos, bool hide)
+{
+    uint8_t i = 0, delta = 0;
+    uint8_t x = 0, y = 0;
+
+    if (pos > 99)
+    {
+        delta = 1;
+        pos -= 100;
+    }
+
+    x = pos % 10;
+    y = pos / 10;
+
+    x += fieldX + quadrant_offset[quadrant][0];
+    y += quadrant_offset[quadrant][1];
+
+    if (hide)
+    {
+        int i = 0;
+
+        if (!delta)
+        {
+            for (i=0;i<size;i++)
+            {
+                drawIcon(x++, y, 0x38);
+            }
+        }
+        else
+        {
+            for (i=0;i<size;i++)
+            {
+                drawIcon(x, y++, 0x38);
+            }
+        }
+
+        return;
+    }
+    else
+    {
+        drawShipInternal(x, y, size, delta);
+    }
+}
+
+/**
+ * @brief Draw a ship in the drawer
+ * @param player Player # (0-3)
+ * @param index Ship # (0-4)
+ * @param size Size (1-5)
+ * @param status Status (0-1) (dead-alive)
+ */
+void drawLegendShip(uint8_t player, uint8_t index, uint8_t size, uint8_t status)
+{
+    uint8_t i=0;
+    uint8_t x=quadrant_offset[player][0]+fieldX+legendShipOffset[index][0];
+    uint8_t y=quadrant_offset[player][1]+legendShipOffset[index][1];
+
+    if (player > 1 || (player > 0 && fieldX > 0))
+    {
+        y++;
+        x+=11;
+    }
+    else
+    {
+        y++;
+        x-=4;
+    }
+
+    if (status)
+    {
+        drawShipInternal(x, y, size, 1); // draw a nice vertical ship
+    }
+    else
+    {
+        // Draw the red splats, instead
+        for (i=0;i<size;i++)
+            drawIcon(x,y+i,0x1C);
+    }
+}
+
+/**
+ * @brief Draw game field for given quadrant
+ * @param quadrant Player to draw (0-3)
+ * @param field Pointer to each 10x10 field array
+ */
+void drawGamefield(uint8_t quadrant, uint8_t *field)
+{
+    uint8_t ix=0, iy=0;
+    uint8_t x = quadrant_offset[quadrant][0] + fieldX;
+    uint8_t y = quadrant_offset[quadrant][1];
+
+    for (iy=0;iy<10;iy++)
+    {
+        for (ix=0;ix<10;ix++)
+        {
+            if (*field)
+            {
+                drawIcon(x+ix, y+iy, *field == 1 ? 0x39 : 0xE1);
+            }
+            field++;
+        }
+    }
+}
+
+/**
+ * @brief paint cursor
+ */
+void xorCursor(void)
+{
+    // Need to figure out wtf to do here
+}
+
+
+void drawGamefieldUpdate(uint8_t quadrant, uint8_t *gamefield, uint8_t attackPos, uint8_t anim)
+{
+    uint8_t x=quadrant_offset[quadrant][0] + fieldX + (attackPos % 10);
+    uint8_t y=quadrant_offset[quadrant][1] + (attackPos / 10);
+    uint8_t c=gamefield[attackPos];
+
+    if (cursorVisible)
+    {
+        cursorVisible=false;
+        xorCursor();
+    }
+
+    // Animate attack
+    if (anim > 9)
+    {
+        drawIcon(x, y, 217+anim);
+        return;
+    }
+
+    if (c == FIELD_ATTACK)
+    {
+        drawIcon(x, y, anim ? 0x1B : 0x39);
+    }
+    else if (c == FIELD_MISS)
+    {
+        drawIcon(x, y, 0xE1);
+    }
+}
+
+/**
+ * @brief Draw game field cursor
+ */
+void drawGamefieldCursor(uint8_t quadrant, uint8_t x, uint8_t y, uint8_t *gamefield, uint8_t blink)
+{
+    unsigned char ex = quadrant_offset[quadrant][0] + fieldX + x;
+    unsigned char ey = quadrant_offset[quadrant][1] + y;
+    unsigned char pos = (y*10) + x;
+
+    unsigned char c = 0;
+    char tmp[3] = {0,0,0};
+
+    switch (gamefield[pos])
+    {
+    case FIELD_ATTACK:
+        c = 0x43;
+        break;
+    case FIELD_MISS:
+        c = 0x46;
+        break;
+    default:
+        c = 0x40;
+        break;
+    }
+
+    drawIcon(ex, ey, c + blink);
+}
+
+/**
+ * @brief Draw end game message
+ * @param message ptr to end game message
+ */
+void drawEndgameMessage(const char *message)
+{
+    uint8_t i, x, ix;
+    i = (uint8_t)strlen(message);
+    x = WIDTH / 2 - i / 2;
+
+    for (ix=0;ix<WIDTH;ix++)
+        drawIcon(ix, HEIGHT-2, 0xE2);
+
+    drawSpace(0, HEIGHT-1,WIDTH);  
+    drawText(x,HEIGHT-1,message);
+}
+
+/**
+ * @brief Draw a box
+ * @param x left of box (0-39)
+ * @param y top of box (0-24)
+ * @param w width of box (0-39)
+ * @param h height of box (0-24)
+ */
+void drawBox(unsigned char x, unsigned char y, unsigned char w, unsigned char h)
+{
+    drawIcon(x, y, 0x3b);
+    drawIcon(x+w+1,y,0x3c);
+    drawIcon(x, y+h+1, 0x3D);
+    drawIcon(x+w+1, y+h+1, 0x3E);
+}

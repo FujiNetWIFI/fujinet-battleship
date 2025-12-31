@@ -1,5 +1,5 @@
 /*
-  Platform specific input. 
+  Platform specific input.
 */
 #ifndef INPUT_H
 #define INPUT_H
@@ -11,3 +11,4 @@
 uint8_t readJoystick();
 
 #endif /* INPUT_H */
+

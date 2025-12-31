@@ -23,7 +23,7 @@ uint8_t apiCall(const char *path)
     strcat(url, serverEndpoint);
     strcat(url, path);
     strcat(url, query);
-    strcat(url, query[0] ? "&bin=1" : "?bin=1");
+    strcat(url, query[0] ? "&bin=1&v=" API_CLIENT_VERSION : "?bin=1&v=" API_CLIENT_VERSION);
 
     if (network_open(url, OPEN_MODE_HTTP_GET, OPEN_TRANS_NONE))
     {

@@ -1,7 +1,9 @@
 #ifndef _JOYSTICK_H
 #define _JOYSTICK_H
 
+#ifdef _CMOC_VERSION_
 #include <coco.h>
+#endif
 
 /* Argument for the joy_read function */
 #define JOY_1 0

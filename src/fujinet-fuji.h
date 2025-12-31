@@ -267,7 +267,7 @@ bool fuji_copy_file(uint8_t src_slot, uint8_t dst_slot, char *copy_spec);
  * @brief Creates a new disk from the given structure.
  * @return Success status, true if all OK.
  */
-bool fuji_create_new(NewDisk *new_disk);
+//bool fuji_create_new(NewDisk *new_disk);
 
 bool fuji_disable_device(uint8_t d);
 bool fuji_enable_device(uint8_t d);

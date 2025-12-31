@@ -7,7 +7,11 @@
 #include "misc.h"
 #include "stateclient.h"
 #include "screens.h"
-#include <peekpoke.h>
+// #include <peekpoke.h>
+
+#ifdef __WATCOMC__
+#define cgetc getch
+#endif /* __WATCOMC__ */
 
 #ifndef TIMER_WIDTH
 #define TIMER_WIDTH 1
@@ -31,6 +35,7 @@ void progressAnim(uint8_t y)
 
 void processStateChange()
 {
+    static uint8_t i;
 
     switch (clientState.game.status)
     {
@@ -47,6 +52,14 @@ void processStateChange()
     state.prevPlayerCount = clientState.game.playerCount;
     state.prevActivePlayer = clientState.game.activePlayer;
     state.prevAttackPos = clientState.game.lastAttackPos;
+
+    if (clientState.game.status >= STATUS_GAMESTART)
+    {
+        for(i=0;i<clientState.game.playerCount;i++)
+        {
+            memcpy(&state.gamefield[i], &clientState.game.players[i].gamefield, 100);
+        }
+    } 
 }
 
 #define READY_LEFT WIDTH / 2 - 8
@@ -59,6 +72,10 @@ void renderLobby()
     if (clientState.game.status != state.prevStatus || state.drawBoard)
     {
         state.drawBoard = false;
+        
+        // Clear gamefield
+        memset(state.gamefield, 0, sizeof(state.gamefield));
+
         resetScreen();
 
         // Round 0 - Ready Up screen
@@ -172,17 +189,17 @@ void handleShipPlacement()
                 if (!blink)
                 {
                     // Clear existing ship
-                    drawShip(size, pos, 1);
+                    drawShip(0, size, pos, DRAWSHIP_HIDE);
                 }
 
                 // New ship position
                 pos = y * 10 + x + dir * 100;
-                drawShip(size, pos, blink);
+                drawShip(0, size, pos, blink);
 
                 // Redraw other ships in case they were overwritten
                 for (i = 0; i < shipPlaceIndex; i++)
                 {
-                    drawShip(shipSize[i], shipPlacements[i], 0);
+                    drawShip(0, shipSize[i], shipPlacements[i], DRAWSHIP_SHOW);
                 }
                 if (change)
                 {
@@ -295,7 +312,7 @@ void renderGameboard()
             {
                 for (i = 0; i < 5; i++)
                 {
-                    drawShip(shipSize[i], clientState.game.myShips[i], 0);
+                    drawShip(0, shipSize[i], clientState.game.myShips[i], DRAWSHIP_SHOW);
                 }
             }
 
@@ -327,7 +344,7 @@ void renderGameboard()
                 {
                     for (i = 0; i < clientState.game.playerCount; i++)
                     {
-                        if (clientState.game.players[i].playerStatus == PLAYER_STATUS_DEFAULT && i != state.prevActivePlayer)
+                        if (i != state.prevActivePlayer && clientState.game.players[i].playerStatus == PLAYER_STATUS_DEFAULT && state.gamefield[i][clientState.game.lastAttackPos] == 0 )
                             drawGamefieldUpdate(i, clientState.game.players[i].gamefield, clientState.game.lastAttackPos, j);
                     }
                     pause(5);
@@ -339,7 +356,7 @@ void renderGameboard()
             {
                 for (i = 0; i < clientState.game.playerCount; i++)
                 {
-                    if (i != state.prevActivePlayer)
+                    if (i != state.prevActivePlayer && state.gamefield[i][clientState.game.lastAttackPos] == 0)
                         drawGamefieldUpdate(i, clientState.game.players[i].gamefield, clientState.game.lastAttackPos, j & 1);
                 }
                 if (!playedSound)
@@ -373,7 +390,7 @@ void renderGameboard()
                         drawLegendShip(i, j, shipSize[j], jj & 1);
                     }
 
-                    soundHit();
+                    soundSink();
                 }
                 else
                 {
@@ -387,21 +404,34 @@ void renderGameboard()
 
         if (clientState.game.status != STATUS_GAMEOVER || redraw || clientState.game.status != state.prevStatus)
         {
+            // Clear active player
             for (i = 0; i < clientState.game.playerCount; i++)
             {
                 // Draw player name
-                drawPlayerName(i, i == 0 && clientState.game.playerStatus != PLAYER_STATUS_VIEWING ? "you" : (const char *)clientState.game.players[i].name, i == clientState.game.activePlayer);
+                if (i != clientState.game.activePlayer)
+                    drawPlayerName(i, i == 0 && clientState.game.playerStatus != PLAYER_STATUS_VIEWING ? "you" : (const char *)clientState.game.players[i].name, false);
             }
 
-            // Blink active player
-            if (clientState.game.activePlayer > 0)
+            // Indicate active player if not game over
+            if (clientState.game.status != STATUS_GAMEOVER)
             {
-                pause(15);
-                drawPlayerName(clientState.game.activePlayer, clientState.game.players[clientState.game.activePlayer].name, false);
+                // Show active player
+                if (clientState.game.activePlayer >= 0)
+                {
+                    drawPlayerName(clientState.game.activePlayer, clientState.game.activePlayer == 0 && clientState.game.playerStatus != PLAYER_STATUS_VIEWING ? "you" : (const char *)clientState.game.players[clientState.game.activePlayer].name, true);
+                }
 
-                pause(15);
-                drawPlayerName(clientState.game.activePlayer, clientState.game.players[clientState.game.activePlayer].name, true);
-                pause(15);
+                // Blink active player
+                if (clientState.game.activePlayer > 0)
+                {
+
+                    pause(15);
+                    drawPlayerName(clientState.game.activePlayer, clientState.game.players[clientState.game.activePlayer].name, false);
+
+                    pause(15);
+                    drawPlayerName(clientState.game.activePlayer, clientState.game.players[clientState.game.activePlayer].name, true);
+                    pause(15);
+                }
             }
         }
     }
@@ -409,11 +439,31 @@ void renderGameboard()
     // Display the gameover message and play a sound if the state just changed
     if (clientState.game.status == STATUS_GAMEOVER && (redraw || clientState.game.status != state.prevStatus))
     {
+        // Reveal winning player's ships (if not this player)
+        waitvsync();
+        if (clientState.game.activePlayer > 0)
+        {
+            for (i = 0; i < 5; i++)
+            {
+                drawShip(clientState.game.activePlayer, shipSize[i], clientState.game.myShips[5 + i], DRAWSHIP_SHOW);
+            }
+
+            drawGamefield(clientState.game.activePlayer, clientState.game.players[clientState.game.activePlayer].gamefield);
+        }
+
         drawEndgameMessage(clientState.game.prompt);
 
         if (clientState.game.status != state.prevStatus)
         {
             soundGameDone();
+
+            // Wait for user to press button to close game result
+            clearCommonInput();
+            while (!input.trigger)
+            {
+                waitvsync();
+                readCommonInput();
+            }
         }
     }
 
@@ -431,7 +481,7 @@ void renderGameboard()
                 // Draw already placed ships from game state
                 for (i = 0; i < 5; i++)
                 {
-                    drawShip(shipSize[i], clientState.game.myShips[i], 0);
+                    drawShip(0, shipSize[i], clientState.game.myShips[i], DRAWSHIP_SHOW);
                 }
             }
         }
@@ -449,7 +499,7 @@ void renderGameboard()
 void placeShip(uint8_t shipSize, uint8_t pos)
 {
     uint8_t i;
-    drawShip(shipSize, pos, false);
+    drawShip(0, shipSize, pos, DRAWSHIP_SHOW);
     for (i = 0; i < shipSize; i++)
     {
         tempBuffer[pos % 100] = 1;
@@ -565,28 +615,46 @@ void waitOnPlayerMove()
         // Handle trigger press
         if (input.trigger)
         {
-            soundAttack();
+
             attackPos = posY * 10 + posX;
 
-            // Animate attack
-            for (j = 10; j < 16; j++)
+            // Check if at least one enemy cell is valid to attack
+            for (i = 1; i < clientState.game.playerCount; i++)
             {
-                for (i = 1; i < clientState.game.playerCount; i++)
-                {
-                    if (clientState.game.players[i].playerStatus == PLAYER_STATUS_DEFAULT)
-                        drawGamefieldUpdate(i, clientState.game.players[i].gamefield, attackPos, j);
-                }
-                pause(5);
+                if (clientState.game.players[i].playerStatus == PLAYER_STATUS_DEFAULT && state.gamefield[i][attackPos] == 0 )
+                    break;
             }
 
-            // Send command to score this value
-            strcpy(moveBuffer, "attack/");
-            itoa(attackPos, moveBuffer + strlen(moveBuffer), 10);
-            sendMove(moveBuffer);
+            if (i == clientState.game.playerCount)
+            {
+                // Invalid location
+                soundInvalid();
+            }
+            else 
+            {
+                // Attack!
+                soundAttack();
+                
+                // Animate attack / clear cursor
+                for (j = 10; j < 16; j++)
+                {
+                    for (i = 1; i < clientState.game.playerCount; i++)
+                    {
+                        if (clientState.game.players[i].playerStatus == PLAYER_STATUS_DEFAULT)
+                            drawGamefieldUpdate(i, clientState.game.players[i].gamefield, attackPos, state.gamefield[i][attackPos] == 0 ?  j : 0);
+                    }
+                    pause(5);
+                }
 
-            // Clear timer
-            drawSpace(WIDTH - TIMER_WIDTH - 2, HEIGHT - 1, 2 + TIMER_WIDTH);
-            return;
+                // Send command to score this value
+                strcpy(moveBuffer, "attack/");
+                itoa(attackPos, moveBuffer + strlen(moveBuffer), 10);
+                sendMove(moveBuffer);
+
+                // Clear timer
+                drawSpace(WIDTH - TIMER_WIDTH - 2, HEIGHT - 1, 2 + TIMER_WIDTH);
+                return;
+            }
         }
 
         // Update cursor

@@ -1,12 +1,15 @@
 #ifndef MISC_H
 #define MISC_H
 
-#include <joystick.h>
+//#include <joystick.h>
 #include <conio.h>
 #include "platform-specific/graphics.h"
 #include "platform-specific/input.h"
 #include <stdbool.h>
 #include <stdint.h>
+
+// Client version string to send to server
+#define API_CLIENT_VERSION "2"
 
 // FujiNet AppKey settings. These should not be changed
 #define AK_LOBBY_CREATOR_ID 1   // FUJINET Lobby
@@ -47,6 +50,9 @@
 #define LEGEND_SHIP_DESTROYED 0
 #define LEGEND_SHIP_INTACT 1
 
+#define DRAWSHIP_SHOW 0
+#define DRAWSHIP_HIDE 1
+
 typedef struct
 {
     char table[9];
@@ -83,7 +89,8 @@ typedef struct
     int8_t activePlayer;
     uint8_t moveTime;
     uint8_t lastAttackPos;
-    uint8_t myShips[5];
+    // First 5 are my ships, last 5 are winner, sent at game over
+    uint8_t myShips[10];
     Player players[PLAYER_MAX];
 } Game;
 
@@ -121,18 +128,21 @@ typedef struct
     int8_t prevActivePlayer;
     int8_t prevAttackPos;
 
-    uint8_t shipsLeft[4][5];
-
     bool countdownStarted;
     bool waitingOnEndGameContinue;
     bool drawBoard;
     bool inGame;
 
+    // Track gamefield state - used to know when to fire shoot animation
+    uint8_t gamefield[PLAYER_MAX][100];
+
+    // Track ships left - used to know when to fire sink animation
+    uint8_t shipsLeft[PLAYER_MAX][5];
 } GameState;
 
 typedef struct
 {
-    uint8_t key;
+    uint16_t key;
     bool trigger;
     int8_t dirX;
     int8_t dirY;

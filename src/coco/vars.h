@@ -1,10 +1,24 @@
 #ifndef KEYMAP_H
 #define KEYMAP_H
 
-// Screen dimensions for platform
+// #define COCO3
 
+// Screen/graphics defines
+#ifdef COCO3
+#define WIDTH 40
+#define HEIGHT 25
+#define CHAR_SHIFT << 5 // 4bpp characters
+#define SCREEN 0x8000U
+#define ROP_TYPE uint16_t
+#define BPC 4 // Bytes per character
+#else
 #define WIDTH 32
 #define HEIGHT 24
+#define CHAR_SHIFT << 3 // 2bpp characters
+#define SCREEN 0x6000U
+#define ROP_TYPE uint8_t
+#define BPC 1 // Bytes per character
+#endif
 
 // Other platform specific constnats
 

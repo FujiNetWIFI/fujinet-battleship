@@ -25,8 +25,11 @@ void drawTextAlt(uint8_t x, uint8_t y, const char *s);
 void drawIcon(uint8_t x, uint8_t y, uint8_t icon);
 
 /// @brief Draw (or erase) a ship at given size and position.
-/// Used for placing ships at start of game and showing intact ships in the legend during gameplay
-void drawShip(uint8_t size, uint8_t pos, bool hide);
+/// @param quadrant player index (0-3) for positioning purpose
+/// @param size ship size (2-5)
+/// @param pos ship position 0-99, add 100 for vertical
+/// @param hide 0=show, 1=hide
+void drawShip(uint8_t quadrant, uint8_t size, uint8_t pos, bool hide);
 
 /// @brief Draw a ship either in whole or destroyed, in the legend (side trays)
 /// @param player player index (0-3) for positioning purpose
@@ -51,18 +54,18 @@ void drawEndgameMessage(const char *message);
 void drawGamefield(uint8_t quadrant, uint8_t *field);
 
 /// @brief Draw/update a single cell (attackPos) for the the specified gamefield
-/// @param quadrant player index (0-3)
+/// @param quadrant [0-3] player index
 /// @param gamefield pointer to 100 byte gamefield array from server
-/// @param attackPos 0-99 position of cell to update
-/// @param flag 0/1 - used to toggle between two "hit" sprites for animation. 10-14 - cycle through attack animation
-void drawGamefieldUpdate(uint8_t quadrant, uint8_t *gamefield, uint8_t attackPos, uint8_t blink);
+/// @param attackPos [0-99] position of cell to update
+/// @param anim [0/1,10-15] : [0/1] toggle between two "hit" sprites for animation, [10-15] attack animation
+void drawGamefieldUpdate(uint8_t quadrant, uint8_t *gamefield, uint8_t attackPos, uint8_t anim);
 
 /// @brief  Draw the cursor at the specified position on the specified gamefield
-/// @param quadrant     player index (0-3)
-/// @param x    cursor x position (0-9)
-/// @param y    cursor y position (0-9)
+/// @param quadrant     [0-3] player index
+/// @param x    [0-9] cursor x position
+/// @param y    [0-9] cursor y position
 /// @param gamefield pointer to 100 byte gamefield array from server
-/// @param blink 0-2 - used to cycle between different cursor sprites
+/// @param blink [0-2] used to cycle between different cursor sprites
 void drawGamefieldCursor(uint8_t quadrant, uint8_t x, uint8_t y, uint8_t *gamefield, uint8_t blink);
 
 /// @brief Draw the clock icon at the bottom right of the screen

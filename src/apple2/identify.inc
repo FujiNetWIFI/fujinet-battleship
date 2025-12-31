@@ -1,0 +1,4 @@
+TYPE_II		:=	0
+TYPE_IIE	:=	1
+TYPE_IIC	:=	2
+TYPE_IIGS	:=	3

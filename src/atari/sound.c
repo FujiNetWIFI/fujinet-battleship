@@ -178,6 +178,19 @@ void soundHit()
     soundStop();
 }
 
+void soundSink()
+{
+    uint8_t i;
+    for (i = 0; i < 10; i++)
+    {
+        sound(0, 50 + i, 0, 9 - i);
+        pause(1);
+        sound(0, 80 + i, 0, 9 - i);
+        pause(1);
+    }
+    soundStop();
+}
+
 void soundStop()
 {
     _sound(0, 0, 0, 0);

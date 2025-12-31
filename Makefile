@@ -6,11 +6,21 @@
 # Read makefiles/README.md for more information                 #
 #################################################################
 
-# TO BUILD: Run 'make <platform>'
+# TO BUILD: 		make <platform>
+# PLATFORMS: 		apple2 atari coco coco3 msdos
+# PLATFORMS TODO:   c64 adam msxrom
+
+# COCO SPECIFIC:
+# 	Coco 1/2: 		make coco
+# 	Coco 3: 		make coco3
+#   Combined Dist:  make coco-dist
+#   Test Dist:      make coco-dist test-coco-dist
+
+
 
 PRODUCT = fbs
-PLATFORMS = coco atari c64
-#PLATFORMS = coco apple2 atari c64 adam msdos msxrom # TODO
+PRODUCT_UPPER = FBS
+PLATFORMS = coco msdos atari apple2 c64
 
 
 
@@ -19,34 +29,65 @@ PLATFORMS = coco atari c64
 SRC_DIRS = src src/%PLATFORM%
 
 # FUJINET_LIB - specify version such as 4.7.6, or leave empty for latest
-FUJINET_LIB = 
+FUJINET_LIB = 4.8.2
 
-#################################################################
+
 ## Compiler / Linker flags                                     ##
 #################################################################
 
 ## Include platform specific vars.h
 CFLAGS += -DPLATFORM_VARS="\"../$(PLATFORM)/vars.h\""
 
-## COCO (CMOC)
+## MS-DOS hack - combination of wine/wcc doesn't like \" above, so resorting to manual include in vars.h
+ifeq ($(PLATFORM),msdos)
+  CFLAGS =
+endif
+
 CFLAGS_EXTRA_COCO = \
 	-Wno-assign-in-condition \
 	-I src/include \
 	--no-relocate \
-	--intermediate 
+	--intermediate
 
-LDFLAGS_EXTRA_COCO = --limit=5fff --org=1000
+## COCO 1/2 or COCO 3 specific flags
+ifeq ($(MAKE_COCO3),COCO3)
+	CFLAGS_EXTRA_COCO += -DCOCO3
+	LDFLAGS_EXTRA_COCO = --limit=7800 --org=1000 # Coco3
+else
+	LDFLAGS_EXTRA_COCO = --limit=5ff0 --org=1000 # Coco1/2
+endif
 
+# Variables for coco-dist
+R2R_PRODUCT = r2r/coco/$(PRODUCT)
+COCO_DISK = $(R2R_PRODUCT).dsk
 
+coco3:
+	make coco MAKE_COCO3=COCO3
+
+# Apple II specific flags (cc65)
+CFLAGS_EXTRA_APPLE2 += -Os -D__APPLE2__
+LDFLAGS_EXTRA_APPLE2 += --start-addr 0x4000 --ld-args -D,__HIMEM__=0xBF00
 #################################################################
 ## PRE BUILD STEPS                                             ##
 #################################################################
 
-# Delete charset objects so every build gets the latest charset
-# from /support/[platform]/charset.fnt without needing to clean. 
-$(PLATFORM)/r2r::
-	rm -f build/$(PLATFORM)/charset.o
 
+
+$(PLATFORM)/r2r::
+#   TEMP USE - Uncomment to clean entire obj dir
+#	rm -rf $(OBJ_DIR)
+
+#	Delete charset objects so every build gets the latest charset
+#	from /support/[platform] without needing to clean.
+	rm -f build/$(PLATFORM)/charset.o
+	rm -f build/$(PLATFORM)/hires.o
+
+#   COCO ONLY - copy proper file for Coco1/2 vs Coco3	
+ifeq ($(MAKE_COCO3),COCO3)
+	cp support/coco/charset-16.img.bin support/coco/charset.bin
+else
+	cp support/coco/charset.fnt support/coco/charset.bin
+endif
 
 #################################################################
 # Include MekkoGX makefile system (Make Gen-X)
@@ -69,11 +110,17 @@ coco/disk-post::
 #   Mount the disk in FujiNet-PC (assumes host 1 is SD)
 	curl -s "http://localhost:8000/browse/host/1/$(PRODUCT).dsk?action=newmount&slot=1&mode=r" >/dev/null
 	curl -s "http://localhost:8000/mount?mountall=1&redirect=1" >/dev/null
-#	
+#
 # 	Fast speed: -ui_active and -nothrottle starts the emulator in fast mode to quickly load the app. I then throttle it to 100% speed with a hotkey.
-#	cd ~/mame_coco;mame coco -ui_active -nothrottle -window -nomaximize -resolution 1200x1024 -autoboot_delay 2 -nounevenstretch  -autoboot_command "runm\"$(PRODUCT)\n"
+
 #	cd ~/mame_coco;mame coco3 -ui_active -nothrottle -window -nomaximize -resolution 1300x1024 -autoboot_delay 2 -nounevenstretch  -autoboot_command "runm\"$(PRODUCT)\n"
-	cd ~/mame_coco;mame coco3 -ui_active -nothrottle -window -nomaximize -resolution 800x600 -autoboot_delay 2 -nounevenstretch  -autoboot_command "runm\"$(PRODUCT)\n"
+ifneq ($(SKIP_EMU),1)
+ifeq ($(MAKE_COCO3),COCO3)
+	cd ~/mame_coco;mame coco3 -ui_active -nothrottle -window -nomaximize -resolution 1300x1024 -autoboot_delay 2 -nounevenstretch  -autoboot_command "runm\"$(PRODUCT)\n"
+else
+	cd ~/mame_coco;mame coco -ui_active -nothrottle -window -nomaximize -resolution 1200x1024 -autoboot_delay 2 -nounevenstretch  -autoboot_command "runm\"$(PRODUCT)\n"
+endif
+endif
 # Start normal speed
 #	cd ~/mame_coco;mame coco -ui_active -throttle -window -nomaximize -resolution 1200x1024 -autoboot_delay 2 -nounevenstretch  -autoboot_command "runm\"fbs\n"
 
@@ -83,7 +130,60 @@ atari/disk-post::
 #	Copy to fujinet-pc SD drive. On first run, mount that drive for future runs
 #	cp $(EXECUTABLE) ~/Documents/fujinetpc-atari/SD
 
+msdos/disk-post::
+#	cp $(DISK) ~/tnfs/
+#	Copy to fujinet-pc SD drive.
+	cp $(DISK) ~/Documents/fujinetpc-rs232/SD
+#	Mount the disk in FujiNet-PC (assumes host 1 is SD)
+	curl -s "http://localhost:8005/browse/host/1/$(PRODUCT).img?action=newmount&slot=1&mode=r" >/dev/null 2>&1
+	curl -s "http://localhost:8005/mount?mountall=1&redirect=1" >/dev/null 2>&1
+
+apple2/disk-post::
+# HACK - MekkoGX Currently doesn't use the preferred bootable PO for Apple II, so manually creating
+	cp support/apple2/bootable.po $(DISK)
+	ac -p "$(DISK)" $(PRODUCT_UPPER).SYSTEM SYS < $(CC65_UTILS_DIR)/$(LOADER_SYSTEM)
+	ac -as "$(DISK)" $(PRODUCT_UPPER) bin <$(EXECUTABLE)
+	
 
 # Reset FujiNet-PC
 reset-fn:
 	curl http://localhost:8000/restart >/dev/null
+
+
+#################################################################
+## CUSTOM DISTRIBUTION RECIPES                                 ##
+#################################################################
+
+coco-dist:
+	make clean	
+# Build both versions of the program, clearing build dir between builds
+	rm -rf $(BUILD_DIR)
+	make coco SKIP_EMU=1
+	mv r2r/coco/$(PRODUCT).bin $(R2R_PRODUCT)12.bin 
+
+	rm -rf $(BUILD_DIR)
+	make coco3 SKIP_EMU=1
+	mv r2r/coco/$(PRODUCT).bin $(R2R_PRODUCT)3.bin 
+
+# Build the loader
+	cmoc -DPRODUCT=\"$(PRODUCT_UPPER)\" -o $(R2R_PRODUCT).bin support/coco/loader.c
+
+# Create the disk with the loader and both versions of the program
+	$(RM) $(COCO_DISK)
+	decb dskini $(COCO_DISK)
+	echo RUNM\"$(PRODUCT_UPPER)\" > build/coco/autoexec.bas
+	decb copy -t -0 build/coco/autoexec.bas $(COCO_DISK),AUTOEXEC.BAS
+	writecocofile $(COCO_DISK) $(R2R_PRODUCT).bin
+	writecocofile $(COCO_DISK) $(R2R_PRODUCT)12.bin
+	writecocofile $(COCO_DISK) $(R2R_PRODUCT)3.bin
+
+test-coco-dist:
+#   Launch dist disk in emulator
+
+#	Copy to fujinet-pc SD drive. On first run, mount that drive for future runs
+	cp $(COCO_DISK) ~/Documents/fujinetpc-coco/SD
+#	Mount the disk in FujiNet-PC (assumes host 1 is SD)
+	curl -s "http://localhost:8000/browse/host/1/$(PRODUCT).dsk?action=newmount&slot=1&mode=r" >/dev/null
+	curl -s "http://localhost:8000/mount?mountall=1&redirect=1" >/dev/null
+	cd ~/mame_coco;mame coco -ui_active -throttle -window -nomaximize -resolution 1300x1024 -autoboot_delay 2 -nounevenstretch  -autoboot_command ""
+#	cd ~/mame_coco;mame coco3 -ui_active -throttle -window -nomaximize -resolution 1300x1024 -autoboot_delay 2 -nounevenstretch  -autoboot_command ""

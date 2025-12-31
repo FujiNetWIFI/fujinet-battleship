@@ -142,21 +142,6 @@ void soundInvalid()
 
 void soundAttack()
 {
-    // uint16_t i;
-    // uint8_t c;
-
-    // // Enable 6 bit dac
-    // *(uint8_t *)0xFF23 = 0x3F;
-
-    // for (i = 240; i > 70; --i)
-    // {
-    //     c = rand() % i;
-    //     *(uint8_t *)0xFF20 = c;
-    //     *(uint8_t *)0xFF20 = (c & c) - 1;
-    //     *(uint8_t *)0xFF20 = (c & c) + 1;
-    // }
-    // *(uint8_t *)0xFF20 = 0;
-
     uint8_t i;
     for (i = 100; i < 250; i -= 5)
         tone(i, 0, 0);
@@ -178,6 +163,11 @@ void soundHit()
         *(uint8_t *)0xFF20 = c & c + 1;
         *(uint8_t *)0xFF20 = c & c + 10;
     }
+}
+
+void soundSink()
+{
+    soundHit();
 }
 
 // Not applicable to CoCo

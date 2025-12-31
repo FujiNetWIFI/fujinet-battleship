@@ -11,11 +11,6 @@ void initSound();
 
 void disableKeySounds();
 void enableKeySounds();
-
-/* Will bring back sound toggle if there is a platform with no controllable sound volume
-bool toggleSound();
-void setSound();
-*/
 void soundCursor();
 void soundSelect();
 void soundStop();
@@ -27,6 +22,7 @@ void soundPlaceShip();
 void soundAttack();
 void soundInvalid();
 void soundHit();
+void soundSink();
 void soundMiss();
 
 void pause(uint8_t frames);

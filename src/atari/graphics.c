@@ -12,7 +12,6 @@
 #include "vars.h"
 
 extern unsigned char charset[];
-
 // I'm using the space XL/XE allocates to BASIC for player/missles, charset, and screen buffer/backup
 // On graphics initialization, I turn off BASIC, freeing up this space.
 
@@ -443,7 +442,7 @@ void drawShipInternal(uint8_t *dest, uint8_t size, uint8_t delta)
     }
 }
 
-void drawShip(uint8_t size, uint8_t pos, bool hide)
+void drawShip(uint8_t quadrant, uint8_t size, uint8_t pos, bool hide)
 {
     uint8_t i, delta = 0;
     uint8_t *dest;
@@ -454,7 +453,7 @@ void drawShip(uint8_t size, uint8_t pos, bool hide)
         pos -= 100;
     }
 
-    dest = xypos((pos % 10), (pos / 10)) + fieldX + quadrant_offset[0];
+    dest = xypos((pos % 10), (pos / 10)) + fieldX + quadrant_offset[quadrant];
 
     if (hide)
     {
@@ -516,7 +515,7 @@ void drawGamefield(uint8_t quadrant, uint8_t *field)
 }
 
 static bool cursorVisible = false;
-void drawGamefieldUpdate(uint8_t quadrant, uint8_t *gamefield, uint8_t attackPos, uint8_t blink)
+void drawGamefieldUpdate(uint8_t quadrant, uint8_t *gamefield, uint8_t attackPos, uint8_t anim)
 {
     uint8_t *dest = SCREEN_LOC + quadrant_offset[quadrant] + fieldX + (uint16_t)(attackPos / 10) * WIDTH + (attackPos % 10);
     uint8_t c = gamefield[attackPos];
@@ -527,24 +526,20 @@ void drawGamefieldUpdate(uint8_t quadrant, uint8_t *gamefield, uint8_t attackPos
         memset(PM_BASE + 1024, 0, 768);
     }
 
-    // Animate attack (only in empty sea cell)
-    if (blink > 9 && (*dest == TILE_SEA || *dest > 226))
+    // Animate attack only
+    if (anim > 9)
     {
-        *dest = 217 + blink;
+        *dest = 217 + anim;
         return;
     }
 
     if (c == FIELD_ATTACK)
     {
-        *dest = blink ? TILE_HIT2 : TILE_HIT;
+        *dest = anim ? TILE_HIT2 : TILE_HIT;
     }
     else if (c == FIELD_MISS)
     {
         *dest = TILE_MISS;
-    }
-    else
-    {
-        return;
     }
 }
 void drawGamefieldCursor(uint8_t quadrant, uint8_t x, uint8_t y, uint8_t *gamefield, uint8_t blink)

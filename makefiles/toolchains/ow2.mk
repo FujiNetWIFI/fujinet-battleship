@@ -4,11 +4,12 @@ LD_DEFAULT ?= wlink OPTION quiet
 
 include $(MWD)/tc-common.mk
 
-CFLAGS += -0 -bt=dos -ms -s -osh -zu
+CFLAGS += -zq -0 -bt=dos -fr=$(basename $@).err
 ASFLAGS +=
 LDFLAGS += SYSTEM dos LIBPATH $(FUJINET_LIB_DIR)
 
-CFLAGS += -DGIT_VERSION='\"$(GIT_VERSION)\"'
+# Was causing issues when building with wine/wcc on macOS - can add back later
+# CFLAGS += -DGIT_VERSION="$(GIT_VERSION)"
 
 define include-dir-flag
   -I$1
@@ -44,3 +45,13 @@ endef
 define assemble
   $(AS) -c $(ASFLAGS) -o $1 $2 2>&1
 endef
+
+
+# 
+# Z:\Users\eric\Documents\projects\fujinet-battleship>wcc -DPLATFORM_VARS=\"../msdos/vars.h\" -DUSING_FUJINET_LIB -I_cache/fujinet-lib/4.9.0-msdos -zq -0 -bt=dos -fr=build/msdos/gamelogic.err -DGIT_VERSION=\"15f1b22*\" -D__MSDOS__ -ad=build/msdos/gamelogic.d -fo=build/msdos/gamelogic.o src/gamelogic.c
+# Z:\Users\eric\Documents\watcom\wine.cmd wcc -DPLATFORM_VARS="../msdos/vars.h" -DUSING_FUJINET_LIB -I_cache/fujinet-lib/4.9.0-msdos -zq -0 -bt=dos -fr=build/msdos/gamelogic.err -DGIT_VERSION="15f1b22*" -D__MSDOS__ -ad=build/msdos/gamelogic.d -fo=build/msdos/gamelogic.o src/gamelogic.c
+# wine /Users/eric/Documents/WATCOM/wine.cmd wcc -DPLATFORM_VARS=\"\"../msdos/vars.h\"\" -DUSING_FUJINET_LIB -I_cache/fujinet-lib/4.9.0-msdos -zq -0 -bt=dos -fr=build/msdos/gamelogic.err -DGIT_VERSION="15f1b22*" -D__MSDOS__ -ad=build/msdos/gamelogic.d -fo=build/msdos/gamelogic.o src/gamelogic.c
+# wine /Users/eric/Documents/watcom/wine.cmd wcc -DPLATFORM_VARS="../msdos/vars.h" -DUSING_FUJINET_LIB -I_cache/fujinet-lib/4.9.0-msdos -zq -0 -bt=dos -fr=build/msdos/gamelogic.err -D__MSDOS__ -ad=build/msdos/gamelogic.d -fo=build/msdos/gamelogic.o src/gamelogic.c
+# Z:\Users\eric\Documents\watcom\wine.cmd wcc -DPLATFORM_VARS="../msdos/vars.h" -DUSING_FUJINET_LIB -I_cache/fujinet-lib/4.9.0-msdos -zq -0 -bt=dos -fr=build/msdos/gamelogic.err -DGIT_VERSION="15f1b22*" -D__MSDOS__ -ad=build/msdos/gamelogic.d -fo=build/msdos/gamelogic.o src/gamelogic.c
+# Z:\Users\eric\Documents\watcom\wine.cmd wcc -DPLATFORM_VARS=\"../msdos/vars.h\" -DUSING_FUJINET_LIB -I_cache/fujinet-lib/4.9.0-msdos -zq -0 -bt=dos -fr=build/msdos/gamelogic.err -D__MSDOS__ -ad=build/msdos/gamelogic.d -fo=build/msdos/gamelogic.o src/gamelogic.c
+# Z:\Users\eric\Documents\watcom\wine.cmd wcc -DPLATFORM_VARS="../msdos/vars.h" -DUSING_FUJINET_LIB -I_cache/fujinet-lib/4.9.0-msdos -zq -0 -bt dos -fr build/msdos/gamelogic.err -D__MSDOS__ -ad build/msdos/gamelogic.d -fo build/msdos/gamelogic.o src/gamelogic.c
