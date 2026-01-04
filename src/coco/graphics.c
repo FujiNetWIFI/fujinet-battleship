@@ -38,9 +38,9 @@ byte palette[] =
         56, // Light Gray
         63, // White
         28, // Teal
+        11, // Light blue
         1,  // Dark blue
         9,  // Sea blue
-        11, // Light blue
         25, // Foam
         27, // Light foam
         4,  // Dark red
@@ -56,9 +56,9 @@ byte palette[] =
         32, // Light Gray
         48, // White
         30, // Teal
+        28, // Light blue
         13, // Dark blue
         12, // Sea blue
-        28, // Light blue
         44, // Foam
         62, // Light foam
         7,  // Dark red
@@ -67,6 +67,27 @@ byte palette[] =
         21, // Orange
         36, // Yellow
         48  // WHITE FOR NOW - 15  // Dark green
+};
+
+byte waterAnim[] = {
+    // 9>11>25>11
+     9, 1, 9, 25, 
+     11, 1, 9, 25,
+     25, 1, 9, 25,
+     11, 1, 9, 25,
+     
+     11, 1, 9, 25,
+     11, 1, 9, 25,
+     11, 1, 9, 25,
+     
+     11, 1, 9, 25,
+     11, 1, 9, 25,
+     9, 1, 9, 25,
+     11, 1, 9, 25,
+     11, 1, 9, 25,
+     11, 1, 9, 25,
+     11, 1, 9, 25,
+     
 };
 
 byte paletteBackup[16];
@@ -252,7 +273,58 @@ void rgbOrComposite()
 }
 
 uint16_t oldGime;
+
+// uint8_t waterAnimFrame = 0;
+// uint8_t animDelay=0;
+
+// interrupt void animIRQRoutine(void)
+// {
+//     asm
+//     {
+//         lda     $FF03           // check for 60 Hz interrupt
+//         lbpl    irqISR_end      // return if 63.5 us interrupt
+//         lda     $FF02           // reset PIA0, port B interrupt flag
+//     }
+
+//     // Do something in C.
+//     ++animDelay;
+//     if (animDelay>=70)
+//     {
+//         animDelay=0;
+//         ++waterAnimFrame;
+//         if (waterAnimFrame>3) waterAnimFrame = 0;
+//         memcpy((void *)0xFFB5, &waterAnim[waterAnimFrame*4] /* + 16 * (prefs.colorMode - 1)*/, 4);
+//     }
+
+//     asm
+//     {
+//         irqISR_end:
+//     }
+//     // Nothing here, so that next instruction is RTI.
+// }
+
+// uint8_t  oldVec[3];
+
+
+void startWaterAnim()
+{
+    // disableInterrupts();
+    // char *irqVector = * (char **) 0xFFF8;
+    // *irqVector = 0x7E;  // extended JMP instruction
+    // * (void **) (irqVector + 1) = (void *) animIRQRoutine;
+    // enableInterrupts();
+}
+
+void stopWaterAnim()
+{
+    // disableInterrupts();
+    // char *irqVector = * (char **) 0xFFF8;
+    // memcpy(irqVector, &oldVec, 3);
+    // enableInterrupts();
+}
+
 #else
+#define animWater()
 uint8_t cycleNextColor() {
     // Not implemented on CoCo 2
     return 0;
@@ -263,6 +335,7 @@ void initGraphics()
 {
     uint16_t i;
     initCoCoSupport();
+
 
 #ifdef COCO3
 
@@ -303,6 +376,10 @@ void initGraphics()
     resetScreen();
 
     rgbOrComposite();
+
+    // char *irqVector = * (char **) 0xFFF8;
+    // memcpy(&oldVec, irqVector, 3);
+    // startWaterAnim();
 
 #else
     pmode(3, SCREEN);
@@ -626,7 +703,7 @@ void drawLegendShip(uint8_t player, uint8_t index, uint8_t size, uint8_t status)
     else
     {
         // Draw red splats
-        hires_Draw(x, y + 1, 1, size * 8 - 1, ROP_CPY, &charset[(uint16_t)0x1c CHAR_SHIFT]);
+        hires_Draw(x, y + 1, 1, size * 8, ROP_CPY, &charset[(uint16_t)0x1c CHAR_SHIFT]);
     }
 }
 
@@ -640,7 +717,13 @@ void drawGamefieldCursor(uint8_t quadrant, uint8_t x, uint8_t y, uint8_t *gamefi
     }
     else
     {
-        c += 0x18;
+#ifdef COCO3
+        if (!c) 
+            c = 0x6B + ((quadrant+(y*8)%5+x)%6);
+        else
+#endif
+            c += 0x18;
+        
     }
     hires_putc(quadrant_offset_xy[quadrant][0] + fieldX + x, quadrant_offset_xy[quadrant][1] + y * 8, ROP_CPY, c);
 }
@@ -651,6 +734,7 @@ uint8_t *srcMiss = &charset[(uint16_t)0x1A CHAR_SHIFT];
 uint8_t *srcHit2 = &charset[(uint16_t)0x1B CHAR_SHIFT];
 uint8_t *srcHitLegend = &charset[(uint16_t)0x1C CHAR_SHIFT];
 uint8_t *srcAttackAnimStart = &charset[(uint16_t)0x63 CHAR_SHIFT];
+uint8_t *srcWaterStart = &charset[(uint16_t)0x6B CHAR_SHIFT];
 
 
 void drawGamefieldUpdate(uint8_t quadrant, uint8_t *gamefield, uint8_t attackPos, uint8_t anim)
@@ -729,7 +813,7 @@ void drawShipInternal(uint8_t x, uint8_t y, uint8_t size, uint8_t delta)
 
 void drawShip(uint8_t quadrant, uint8_t size, uint8_t pos, bool hide)
 {
-    uint8_t x, y, i, j, delta = 0;
+    uint8_t x, y, i, j, c,ix,iy,delta = 0;
     uint8_t *src;
 
     if (pos > 99)
@@ -738,15 +822,37 @@ void drawShip(uint8_t quadrant, uint8_t size, uint8_t pos, bool hide)
         pos -= 100;
     }
 
-    x = (pos % 10) + fieldX + quadrant_offset_xy[quadrant][0];
-    y = ((pos / 10) + quadrant_offset_xy[quadrant][1] / 8) * 8 + OFFSET_Y;
+    ix= pos % 10;
+    iy= (pos / 10)*8;
+    x = ix + fieldX + quadrant_offset_xy[quadrant][0];
+    y = iy + ( quadrant_offset_xy[quadrant][1] / 8) * 8 + OFFSET_Y;
 
     if (hide)
     {
+#ifdef COCO3
+        // Draw water pattern to hide ship
+        for (i = 0; i < size; i++)
+        {
+            c = 0x6B + ((quadrant+iy%5+ix)%6);
+            hires_putc(x, y, ROP_CPY, c);
+
+            if (delta)
+            {
+                y += 8;
+                iy+=8;
+            }
+            else
+            {
+                x++;
+                ix++;
+            }
+        }
+#else
         if (!delta)
             hires_Mask(x, y, size, 8, ROP_BLUE);
         else
             hires_Mask(x, y, 1, size * 8, ROP_BLUE);
+#endif
         return;
     }
 
@@ -779,7 +885,7 @@ void drawSpace(uint8_t x, uint8_t y, uint8_t w)
 
 void drawBoard(uint8_t currentPlayerCount)
 {
-    uint8_t i, x, y, ix, ox, left = 1, fy, eh, drawEdge, drawX, drawCorner, edgeSkip;
+    uint8_t i, x, y, ix, iy, drawX;
 
     // Center layout
     playerCount = currentPlayerCount;
@@ -808,6 +914,17 @@ void drawBoard(uint8_t currentPlayerCount)
 
         // Fill in the drawer
         hires_Mask(drawX, y + 8, 3, 64, ROP_BLUE);
+
+#ifdef COCO3
+        // Fill in water patterns
+        for (iy = 0; iy < 80; iy+=8)
+        {
+            for (ix = 0; ix < 10; ++ix)
+            {
+                hires_Draw(x+ix, y+iy, 1, 8, ROP_CPY, srcWaterStart + ((i+iy%5+ix)%6) * CHAR_SIZE);
+            }
+        }
+#endif
     }
 }
 
@@ -835,6 +952,7 @@ void resetGraphics()
 {
 
 #ifdef COCO3
+    stopWaterAnim();
     memcpy((void *)0xFFB0, paletteBackup, 16); // assumes RGB monitor
     width(32);
 #else

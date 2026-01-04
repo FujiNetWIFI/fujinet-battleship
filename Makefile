@@ -111,7 +111,7 @@ $(PLATFORM)/r2r::
 
 #   COCO ONLY - copy proper file for Coco1/2 vs Coco3	
 ifeq ($(MAKE_COCO3),COCO3)
-	cp support/coco/charset-16.img.bin support/coco/charset.bin
+	cp support/coco/charset-16.image support/coco/charset.bin
 else
 	cp support/coco/charset.fnt support/coco/charset.bin
 endif

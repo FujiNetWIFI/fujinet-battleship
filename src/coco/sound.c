@@ -4,13 +4,19 @@
 
 #include "../misc.h"
 
+//extern void stopWaterAnim();
+//extern void startWaterAnim();
+
+
 uint16_t ii;
 
 void tone(uint8_t period, uint8_t dur, uint8_t wait)
 {
     if (!prefs.disableSound)
     {
+        //stopWaterAnim();
         sound(period, dur);
+        //startWaterAnim();
     }
 
     while (wait--)
