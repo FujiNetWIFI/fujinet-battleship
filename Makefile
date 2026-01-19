@@ -66,7 +66,7 @@ ifeq ($(MAKE_COCO3),COCO3)
 	LDFLAGS_EXTRA_COCO = --limit=7800 --org=1000
 else
 # 	Coco 1/2	
-	LDFLAGS_EXTRA_COCO = --limit=5ff0 --org=1000
+	LDFLAGS_EXTRA_COCO = --limit=60c7 --org=1000
 endif
 
 ifeq ($(VICE),1)
