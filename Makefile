@@ -66,7 +66,7 @@ ifeq ($(MAKE_COCO3),COCO3)
 	LDFLAGS_EXTRA_COCO = --limit=7800 --org=1000
 else
 # 	Coco 1/2	
-	LDFLAGS_EXTRA_COCO = --limit=60c7 --org=1000
+	LDFLAGS_EXTRA_COCO = --limit=5ff0 --org=1000
 endif
 
 ifeq ($(VICE),1)
@@ -113,7 +113,10 @@ $(PLATFORM)/r2r::
 ifeq ($(MAKE_COCO3),COCO3)
 	cp support/coco/charset-16.image support/coco/charset.bin
 else
-	cp support/coco/charset.fnt support/coco/charset.bin
+# 	The 2bpp charset source file is 1024 bytes (up to 128 characters).
+#   CoCo 1/2 has limited space, so copy just the bytes we need
+#   Currently: 105 characters -  105*8=840 bytes
+	head -c 840 support/coco/charset.fnt > support/coco/charset.bin
 endif
 
 #################################################################
