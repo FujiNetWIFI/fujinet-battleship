@@ -20,7 +20,6 @@ VERSION := $FBB3
 
 .rodata
 
-
 BASELO:
     .repeat $C0, I
     .byte   I & $08 << 4 | I & $C0 >> 1 | I & $C0 >> 3
@@ -38,8 +37,6 @@ BASEHI:
 ;; .incbin "pieces.bin"
 
 .code
-
-
 .proc   _hires_Init
 
         bit     $C082       ; Switch in ROM
@@ -63,7 +60,6 @@ BASEHI:
 
 .endproc
 
-
 .proc   _hires_Done
 
         bit     TXTSET
@@ -74,7 +70,6 @@ BASEHI:
 
 .endproc
 
-
 .proc   _hires_Text
 
         tax                 ; 'flag'
@@ -83,9 +78,7 @@ BASEHI:
 
 .endproc
 
-
 .data
-
 
 .proc   _hires_Draw
 
@@ -140,7 +133,6 @@ ymax:   cpx     #$FF        ; Patched
         rts
 
 .endproc
-
 
 .proc   _hires_Mask
 

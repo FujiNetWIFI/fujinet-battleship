@@ -16,19 +16,8 @@ r2r/
 *~
 *.orig
 *.rej
-#my resource
 *.o
 docs/
 *.po
 *.map
 lib/
-mymake
-png/
-
-*.code-workspace
-
-sync-from-icloud.sh
-sync-to-icloud.sh
-verify-folder-copy.sh
-
-support/fbscfg

@@ -13,6 +13,16 @@
 #define GAMEOVER_PROMPT_Y HEIGHT - 2
 #define LOGO_Y 2
 
+// Hires / board drawing (graphics.c, graphicsBoard.c)
+
+// Checkerboard fill for gamefield (hires_Mask ROP_CONST)
+#define EVEN_BLUE  0b11010101  // Pattern for even x coordinates
+#define ODD_BLUE   0b10101010  // Pattern for odd x coordinates
+
+// White outline OR-masks (single-column hires_Mask)
+#define V_LINE_LEFT   0x07
+#define V_LINE_RIGHT  0xf0
+
 #undef ESCAPE
 #define ESCAPE "BREAK"
 #undef ESC
@@ -29,6 +39,26 @@
 #define ICON_CONNECTION_ODD 0x1f
 #define ICON_CLOCK 0x11
 #define ICON_BLANK 0x20
+
+// Box outline (drawBox) — hires charset cell indices
+#define CHAR_BOX_TOP_LEFT      0x3b
+#define CHAR_BOX_TOP_RIGHT     0x3c
+#define CHAR_BOX_BOTTOM_LEFT   0x3d
+#define CHAR_BOX_BOTTOM_RIGHT  0x3e
+#define CHAR_BOX_SIDE          0x3f
+#define CHAR_BOX_HORIZ         0x40
+
+// Ship hull segments (drawShipInternal) — hires charset
+#define SHIP_HULL_STERN_HORIZ  0x14  // first column, horizontal ship
+#define SHIP_HULL_BOW_HORIZ     0x12  // last column, horizontal ship
+#define SHIP_HULL_MID_HORIZ     0x13
+#define SHIP_HULL_BOW_VERT      0x17  // top segment, vertical ship (bow up)
+#define SHIP_HULL_STERN_VERT    0x15  // bottom segment, vertical ship
+#define SHIP_HULL_MID_VERT      0x16
+
+/* drawShip / drawShipInternal: ship axis (pos below 100 = horizontal, else vertical) */
+#define SHIP_ORIENT_HORIZONTAL  0
+#define SHIP_ORIENT_VERTICAL    1
 
 // Normal display (blink = 0)
 #define EMPTY_NORMAL_EVEN    0x18  // normal even

@@ -19,12 +19,8 @@
 #define ROP_AND(val)            ROP_A|(val)
 #define ROP_OR(val)             ROP_O|(val)
 
-
-
-/* char rop_Line[2][7] = {{0x00, 0x01, 0x03, 0x07, 0x0F, 0x1F, 0x3F}, */
-/*                        {0x00, 0x40, 0x60, 0x70, 0x78, 0x7C, 0x7E}}; */
-
-/* char rop_Color[2][2] = {{0x55, 0x2A}, {0xD5, 0xAA}}; */
+/** hires_Mask: bulk clear / blue-black fill (resetScreen, endgame message area) */
+#define HIRES_MASK_CLEAR_MAIN   0xA900
 
 void hires_Init(void);
 void hires_Done(void);

@@ -7,178 +7,172 @@
 #include <apple2.h>
 
 #include "../misc.h"
-#define CLICK  __asm__ ("sta $c030")
+#define SPEAKER ((volatile uint8_t *)0xC030)
 
 uint16_t ii;
 
 void tone(uint16_t period, uint8_t dur, uint8_t wait) {
-  if (prefs.disableSound)
-    return;
-    
-  while (dur--) {
-    for (ii=0; ii<period; ii++) ;
-    CLICK;
-  }
+    if (prefs.disableSound) {
+        return;
+    }
 
-  while (wait--)
-    for (ii=0; ii<40; ii++) ;
+    while (dur--) {
+        for (ii = 0; ii < period; ii++) {
+            ;
+        }
+        *SPEAKER = 0;
+    }
+
+    while (wait--) {
+        for (ii = 0; ii < 40; ii++) {
+            ;
+        }
+    }
 }
 
 void initSound() {
- 
+    ;
 }
 
 void soundJoinGame() {
-  tone(34,40,115);
-  tone(44,40,40);
-  tone(28,40,0);
+    tone(34, 40, 115);
+    tone(44, 40, 40);
+    tone(28, 40, 0);
 }
 
 void soundMyTurn() {
-  tone(34,40,50);
-  tone(34,40,0);
+    tone(34, 40, 50);
+    tone(34, 40, 0);
 }
 
 void soundGameDone() {
-  tone(83,20,20);
-  tone(79,50,30);
-  tone(65,20,20);
-  tone(61,40,50);
+    tone(83, 20, 20);
+    tone(79, 50, 30);
+    tone(65, 20, 20);
+    tone(61, 40, 50);
 }
 
 void soundTick() {
- tone(80,2,0);
+    tone(80, 2, 0);
 }
-  
+
 void soundPlayerJoin() {
     uint8_t i;
-  for (i=255;i>=235;i-=10)
-    tone(i,5,255);
+    for (i = 255; i >= 235; i -= 10) {
+        tone(i, 5, 255);
+    }
 }
 
 void soundPlayerLeft() {
     uint8_t i;
-  for (i=215;i<255;i+=10)
-    tone(i,5,255);
+    for (i = 215; i < 255; i += 10) {
+        tone(i, 5, 255);
+    }
 }
 
 void soundSelectMove() {
-  tone(35,40,20);
-  tone(30,40,0);
+    tone(35, 40, 20);
+    tone(30, 40, 0);
 }
 
 void soundCursor() {
-  tone(45,10,0);
+    tone(45, 10, 0);
 }
 
 void soundCursorInvalid() {
-  tone(118,5,0);
+    tone(118, 5, 0);
 }
 
 void soundTakeChip(uint8_t counter) {
-  tone(118-counter*3,5,60);
+    tone(118 - counter * 3, 5, 60);
 }
-void soundSelect()
-{
+
+void soundSelect() {
     tone(35, 40, 20);
     tone(40, 40, 0);
 
     tone(25, 60, 0);
 }
 
-void soundHit()
-{
+void soundHit() {
     uint8_t i;
 
     // Start with a strong attack sound
-    tone(24, 25, 8);       // High-pitched short attack
+    tone(24, 25, 8); // High-pitched short attack
 
     // Follow with a longer descending sweep
-    for (i = 0; i < 25; ++i)
-    {
+    for (i = 0; i < 25; ++i) {
         // Gradually lower the pitch by increasing period
-        uint16_t period = 40 + i * 5;   // approximately 40 → 85
+        uint16_t period = 40 + i * 5;
         tone(period, 3, 0);
     }
 }
 
-void soundSink()
-{
+void soundSink() {
     soundHit();
 }
 
-#define SPEAKER ((volatile uint8_t*)0xC030)
-void soundMiss()
-{
-  uint8_t burst, i;
-  uint8_t d;
-  if (prefs.disableSound)
-      return;
+void soundMiss() {
+    uint8_t burst, i;
+    uint8_t d;
+    if (prefs.disableSound) {
+        return;
+    }
 
     // short noise burst
-    for (burst = 0; burst < 3; ++burst)
-    {
-        for (i = 0; i < 25; ++i)
-        {
+    for (burst = 0; burst < 3; ++burst) {
+        for (i = 0; i < 25; ++i) {
             *SPEAKER = 0;
 
-            d = 6 + (rand() & 0x1f);      // about 6〜37 
-            while (d--)
-            {
+            d = 6 + (rand() & 0x1f); // about 6〜37
+            while (d--) {
                 ;
             }
         }
         // short silence between burst
-        for (i = 0; i < 20; ++i)
-        {
+        for (i = 0; i < 20; ++i) {
             d = 40;
-            while (d--)
-            {
+            while (d--) {
                 ;
             }
         }
     }
 }
 
-void soundSunk()
-{
-     // Sound effect when ship sinks
+void soundSunk() {
+    // Sound effect when ship sinks
     // Use descending scale pattern, referencing soundGameDone()
-    tone(70, 30, 10);   // Mid tone
-    tone(80, 30, 10);   // Slightly low tone
-    tone(90, 40, 20);   // Low tone (sinking feeling)
-    tone(100, 50, 0);   // Even lower tone
+    tone(70, 30, 10);  // Mid tone
+    tone(80, 30, 10);  // Slightly low tone
+    tone(90, 40, 20);  // Low tone (sinking feeling)
+    tone(100, 50, 0);  // Even lower tone
 }
 
-void disableKeySounds()
-{
-    // Not implemented in prototype
+void disableKeySounds() {
+    ;
 }
-void enableKeySounds()
-{
-    // Not implemented in prototype
+
+void enableKeySounds() {
+    ;
 }
-void soundInvalid()
-{
+
+void soundInvalid() {
     tone(80, 12, 2);
-    tone(60, 14, 0); 
+    tone(60, 14, 0);
 }
-void soundAttack()
-{
+
+void soundAttack() {
     uint8_t i;
 
-    for (i = 0; i < 8; ++i)
-    {
+    for (i = 0; i < 8; ++i) {
         uint16_t period = 42 - i * 2;
         tone(period, 4, 1);
     }
 }
 
-void soundPlaceShip()
-{
-    // Atari version: frequency 96, volume 5 → frequency 81, volume 4
+void soundPlaceShip() {
     // Apple II version: similar to soundSelectMove() pattern
     // Change from high to low tone
-    tone(35, 40, 20);  // High tone (equivalent to frequency 96)
-    tone(40, 40, 0);   // Low tone (equivalent to frequency 81)
+    tone(35, 40, 20); // High tone (equivalent to frequency 96)
+    tone(40, 40, 0);  // Low tone (equivalent to frequency 81)
 }

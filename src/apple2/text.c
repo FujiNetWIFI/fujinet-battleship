@@ -10,8 +10,6 @@
 #define SCREEN_WIDTH            40
 #define SCREEN_HEIGHT           192
 
-#define BOTTOM 175
-
 extern unsigned char charset[];
 unsigned char rop_mod[] = {0x55,0x2A};
 

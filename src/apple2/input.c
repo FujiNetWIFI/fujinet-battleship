@@ -1,12 +1,9 @@
 /*
-  Apple II Joystick - Prototype version
+  Apple II Joystick
 */
 
 #include <stdint.h>
 
-uint8_t readJoystick(void)
-{
-    // Not implemented in prototype - return 0 (no input)
+uint8_t readJoystick(void) {
     return 0;
 }
-
