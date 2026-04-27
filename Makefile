@@ -1,9 +1,9 @@
 #################################################################
 # THIS is the ONLY Makefile that should be modified.            #
 #                                                               #
-# Do NOT customize files in /makefiles                          #
+# Do NOT customize files in /mekkogx                           #
 #                                                               #
-# Read makefiles/README.md for more information                 #
+# Read mekkogx/README.md for more information                   #
 #################################################################
 
 # TO BUILD: 		make <platform>
@@ -34,7 +34,10 @@ endef
 
 PRODUCT = fbs
 PRODUCT_UPPER = FBS
-PLATFORMS = coco msdos atari apple2 c64
+PLATFORMS = coco atari apple2 c64
+
+# Use "make-exp msdos" to build msdos.
+# That version uses fujinet-lib-experimental.
 
 # SRC_DIRS may use the literal %PLATFORM% token.
 # It expands to the chosen PLATFORM plus any of its combos.
@@ -113,12 +116,15 @@ $(PLATFORM)/r2r::
 ifeq ($(MAKE_COCO3),COCO3)
 	cp support/coco/charset-16.image support/coco/charset.bin
 else
-	cp support/coco/charset.fnt support/coco/charset.bin
+# 	The 2bpp charset source file is 1024 bytes (up to 128 characters).
+#   CoCo 1/2 has limited space, so copy just the bytes we need
+#   Currently: 105 characters -  105*8=840 bytes
+	head -c 840 support/coco/charset.fnt > support/coco/charset.bin
 endif
 
 #################################################################
 # Include MekkoGX makefile system (Make Gen-X)
-include makefiles/toplevel-rules.mk
+include mekkogx/toplevel-rules.mk
 #################################################################
 
 
@@ -161,6 +167,7 @@ atari/disk-post::
 #	cp $(EXECUTABLE) ~/Documents/fujinetpc-atari/SD
 
 msdos/disk-post::
+	mcopy -t -i $(DISK) src/msdos/AUTOEXEC.BAT "::AUTOEXEC.BAT"
 #	cp $(DISK) ~/tnfs/
 #	Copy to fujinet-pc SD drive.
 	cp $(DISK) ~/Documents/fujinetpc-rs232/SD

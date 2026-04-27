@@ -1,0 +1,101 @@
+_fn_device_error../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/fn_device_error.c
+_fuji_field_numbytes_table../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/fuji_field.c
+_fuji_field_numfields_table../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/fuji_field.c
+_nw_status../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network.c
+_port_getbuf../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/bus/msdos/portio.s
+_port_getc../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/bus/msdos/portio.s
+_port_getc_timeout../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/bus/msdos/portio.s
+_port_init../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/bus/msdos/portio.s
+_port_putbuf../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/bus/msdos/portio.s
+_port_putc../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/bus/msdos/portio.s
+fuji_bus_appkey_read_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/bus/msdos/appkey.c
+fuji_bus_appkey_write_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/bus/msdos/appkey.c
+fuji_bus_call_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/bus/msdos/fujinet-bus-msdos.c
+fuji_bus_read_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/bus/msdos/fujinet-bus-msdos.c
+fuji_bus_write_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/bus/msdos/fujinet-bus-msdos.c
+fuji_get_wifi_enabled_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/fuji_get_wifi_enabled.c
+fuji_hash_calculate_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/fuji_hash.c
+fuji_hash_data_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/fuji_hash.c
+fuji_hash_input_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/fuji_hash.c
+fuji_open_directory_filter_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/fuji_open_directory_filter.c
+fuji_read_appkey_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/fuji_appkey.c
+fuji_set_appkey_details_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/fuji_appkey.c
+fuji_write_appkey_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/fuji_appkey.c
+network_accept_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network.c
+network_close_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network.c
+network_http_post_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network_http.c
+network_init_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network.c
+network_json_parse_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network_json.c
+network_json_query_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network_json.c
+network_json_strip_newlines_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network_json.c
+network_open_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network.c
+network_read_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network.c
+network_read_nb_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network.c
+network_status_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network.c
+network_unit_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network.c
+network_unit_status_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network_unit_status_default.c
+network_write_../home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network.c
+ 
+/home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/fn_device_error.c Offset=00000200H
+    _fn_device_error
+ 
+/home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/fuji_appkey.c Offset=00000800H
+    fuji_read_appkey_
+    fuji_set_appkey_details_
+    fuji_write_appkey_
+ 
+/home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/fuji_field.c Offset=00001000H
+    _fuji_field_numbytes_table
+    _fuji_field_numfields_table
+ 
+/home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/fuji_get_wifi_enabled.c Offset=00001400H
+    fuji_get_wifi_enabled_
+ 
+/home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/fuji_hash.c Offset=00001c00H
+    fuji_hash_calculate_
+    fuji_hash_data_
+    fuji_hash_input_
+ 
+/home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/fuji_open_directory_filter.c Offset=00002600H
+    fuji_open_directory_filter_
+ 
+/home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network.c Offset=00002e00H
+    _nw_status
+    network_accept_
+    network_close_
+    network_init_
+    network_open_
+    network_read_
+    network_read_nb_
+    network_status_
+    network_unit_
+    network_write_
+ 
+/home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network_http.c Offset=00003800H
+    network_http_post_
+ 
+/home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network_json.c Offset=00003e00H
+    network_json_parse_
+    network_json_query_
+    network_json_strip_newlines_
+ 
+/home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/common/network_unit_status_default.c Offset=00004600H
+    network_unit_status_
+ 
+/home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/bus/msdos/appkey.c Offset=00004c00H
+    fuji_bus_appkey_read_
+    fuji_bus_appkey_write_
+ 
+/home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/bus/msdos/fujinet-bus-msdos.c Offset=00005200H
+    fuji_bus_call_
+    fuji_bus_read_
+    fuji_bus_write_
+ 
+/home/rich/fujinet-battleship/_cache/fujinet-lib/fujinet-lib-experimental/bus/msdos/portio.s Offset=00005a00H
+    _port_getbuf
+    _port_getc
+    _port_getc_timeout
+    _port_init
+    _port_putbuf
+    _port_putc
+ 
