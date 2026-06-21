@@ -59,15 +59,78 @@ const uint8_t orangeLineFont[2] = {
 };
 
 uint16_t quadrantOffset[] = {
-    98 * 40 + 5,     // = 3925  (Player 0: bottom-left, x=5, y=98)
-    10 * 40 + 5,     // = 405   (Player 1: top-left, x=5, y=10)
-    10 * 40 + 17,    // = 417   (Player 2: top-right, x=17, y=10)
-    98 * 40 + 17     // = 3937  (Player 3: bottom-right, x=17, y=98)
+    98 * 40 + 5,
+    10 * 40 + 5,
+    10 * 40 + 17,
+    98 * 40 + 17 
 };
 
 uint16_t legendShipOffset[] = {2, 1, 0, 256U * 5, 256U * 6 + 1};
 
+static void drawPlayerBorders(uint8_t player, bool active) {
+    uint8_t x, y, drawX, gx;
+    uint8_t indBaseX;
+    uint8_t fieldBorderY;
+    uint16_t pos;
+    uint8_t playerCount = currentPlayerCount;
+    uint8_t topPlayer = (uint8_t)(player == 1 || player == 2);
+    uint8_t rightDrawer = (uint8_t)(player > 1 || (playerCount == 2 && player > 0));
+    const uint8_t *horizPattern = active ? orangeLineFont : greenLineFont;
+
+    pos = fieldX + quadrantOffset[player];
+    x = (uint8_t)(pos % WIDTH);
+    y = (uint8_t)(pos / WIDTH);
+    
+    if (rightDrawer) {
+        drawX = x + FIELD_COLS + 1;
+    } else {
+        drawX = x - (DRAWER_COLS + 1);
+    }
+
+    indBaseX = rightDrawer ? drawX : (uint8_t)(drawX - 1);
+    for (gx = 0; gx < DRAWER_COLOR_IND_WIDTH; gx++) {
+        uint8_t actualX = indBaseX + gx;
+        uint8_t fontIndex = actualX % 2;
+        hires_Draw(actualX, y + DRAWER_IND_SHIFT_TOP_Y, 1, 1,
+                   ROP_CPY_NOFLIP, (char *)&horizPattern[fontIndex]);
+        hires_Draw(actualX, y + DRAWER_IND_SHIFT_BOT_Y, 1, 1,
+                   ROP_CPY_NOFLIP, (char *)&horizPattern[fontIndex]);
+    }
+    fieldBorderY = topPlayer
+        ? (uint8_t)(y + FIELD_BORDER_BOTTOM_Y)
+        : (uint8_t)(y - FIELD_BORDER_TOP_OFFSET);
+    for (gx = 0; gx < FIELD_COLS; gx++) {
+        uint8_t actualX = x + gx;
+        uint8_t fontIndex = actualX % 2;
+        hires_Draw(actualX, fieldBorderY, 1, 1,
+                   ROP_CPY_NOFLIP, (char *)&horizPattern[fontIndex]);
+    }
+}
+
+/* Odd-column hit: clear D6 on left even sea (rows 2 and 6) to avoid white fringe. */
+static void patchFieldHitLeftSea(uint8_t hitX, uint8_t cy, bool leftIsSea) {
+    uint8_t leftX;
+
+    if (!(hitX & 1)) {
+        return;
+    }
+    if (!leftIsSea) {
+        return;
+    }
+    leftX = (uint8_t)(hitX - 1);
+    hires_Mask(leftX, cy + 2, 1, 1, ROP_AND(HIRES_AND_CLEAR_D6));
+    hires_Mask(leftX, cy + 6, 1, 1, ROP_AND(HIRES_AND_CLEAR_D6));
+}
+
 void resetGraphics() {
+    ;
+}
+
+bool saveScreenBuffer() {
+    return false;
+}
+
+void restoreScreenBuffer() {
     ;
 }
 
@@ -84,24 +147,12 @@ void initGraphics() {
     setVsyncProc(type);
 }
 
-bool saveScreenBuffer() {
-    return false;
-}
-
-void restoreScreenBuffer() {
-    ;
-}
-
 void drawEndgameMessage(const char *message) {
     uint8_t x;
     uint8_t len = (uint8_t)strlen(message);
     x = (WIDTH - len) / 2;
 
-    // Clear a wider area to ensure "YOU" and other player names are removed
-    // Clear from y=170 (approximately 4 lines above message) to y=192 (bottom of screen)
-    // This covers the area where player names are drawn (y=178) and the message line (y=183)
     hires_Mask(0, 170, WIDTH, 22, HIRES_MASK_CLEAR_MAIN);
-
     drawTextAt(x, HEIGHT * 8 - 9, message);
 }
 
@@ -139,12 +190,10 @@ void drawSpace(uint8_t x, uint8_t y, uint8_t w) {
     }
 }
 
-
 void drawText(unsigned char x, unsigned char y, const char* s) {
     drawTextAt(x, y * 8 - 4, s);
 }
 
-// Call to clear the screen to an empty table
 void resetScreen() {
     hires_Mask(1, 0, 38, 192, HIRES_MASK_CLEAR_MAIN);
 }
@@ -218,10 +267,50 @@ void drawShip(uint8_t quadrant, uint8_t size, uint8_t pos, bool hide) {
     drawShipInternal(x, y, size, orientation);
 }
 
+static void legendShipPos(uint8_t player, uint8_t index, uint8_t *outX, uint8_t *outY) {
+    uint16_t pos;
+    uint8_t x;
+    uint8_t y;
+    uint8_t drawerX;
+
+    pos = fieldX + quadrantOffset[player];
+    x = (uint8_t)(pos % WIDTH);
+    y = (uint8_t)(pos / WIDTH);
+
+    if (player > 1 || (currentPlayerCount == 2 && player > 0)) {
+        drawerX = x + 11;
+    } else {
+        drawerX = x - 4;
+    }
+
+    if (index < 3) {
+        *outX = drawerX + legendShipOffset[index];
+        *outY = y + 8;
+    } else {
+        *outX = drawerX + (legendShipOffset[index] % 256);
+        *outY = y + (legendShipOffset[index] / 256) * 8 + 8;
+    }
+}
+
+static bool legendPresentAt(uint8_t player, uint8_t col, uint8_t cy) {
+    uint8_t j;
+    uint8_t lx;
+    uint8_t ly;
+
+    for (j = 0; j < 5; j++) {
+        legendShipPos(player, j, &lx, &ly);
+        if (lx == col && cy >= ly && cy < ly + (uint8_t)(shipSize[j] * 8)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void drawLegendShip(uint8_t player, uint8_t index, uint8_t size, uint8_t status) {
     uint8_t x, y;
     uint16_t pos;
     uint8_t drawerX;
+    uint8_t leftDrawer;
 
     pos = fieldX + quadrantOffset[player];
     x = (uint8_t)(pos % WIDTH);
@@ -230,9 +319,11 @@ void drawLegendShip(uint8_t player, uint8_t index, uint8_t size, uint8_t status)
     if (player > 1 || (currentPlayerCount == 2 && player > 0)) {
         // right drawer
         drawerX = x + 11; // ix + 1, where ix = x + 10
+        leftDrawer = 0;
     } else {
         // left drawer
         drawerX = x - 4;  // ix - 3, where ix = x - 1
+        leftDrawer = 1;
     }
     
     if (index < 3) {
@@ -249,9 +340,16 @@ void drawLegendShip(uint8_t player, uint8_t index, uint8_t size, uint8_t status)
         drawShipInternal(x, y, size, SHIP_ORIENT_VERTICAL);
     } else {
         uint8_t i;
+        uint8_t rightCol = x + 1;
+
         for (i = 0; i < size; i++) {
-            hires_Draw(x, y + (i * 8), 1, 8, ROP_CPY,
+            uint8_t cy = y + (i * 8);
+
+            hires_Draw(x, cy, 1, 8, ROP_CPY,
                        (char *)&charset[(uint16_t)((x % 2) ? HIT_LEGEND_ODD : HIT_LEGEND_EVEN) << 3]);
+            if (rightCol < WIDTH && !legendPresentAt(player, rightCol, cy)) {
+                hires_Mask(rightCol, cy, 1, 8, ROP_AND(0xFE));
+            }
         }
     }
 }
@@ -320,7 +418,6 @@ void drawPlayerName(uint8_t player, const char *name, bool active) {
             uint8_t actualX = x - 1 + gx;
             uint8_t fontIndex = (actualX % 2); // 0 for EVEN, 1 for ODD
             hires_Draw(actualX, lineY, 1, 1, ROP_CPY_NOFLIP, (char *)&greenLineFont[fontIndex]);
-            // hires_Mask(actualX, lineY, 1, 1, ROP_BLACK);
         }
     }
     drawPlayerBorders(player, active);
@@ -351,6 +448,10 @@ void drawGamefield(uint8_t quadrant, uint8_t *field) {
                 charCode = (actualX % 2) ? MISS_NORMAL_ODD : MISS_NORMAL_EVEN;
             }
             hires_putc(actualX, baseY + y * 8, ROP_CPY, charCode);
+            if (field[i] == FIELD_ATTACK) {
+                patchFieldHitLeftSea(actualX, (uint8_t)(baseY + y * 8),
+                                     (uint8_t)(x > 0 && field[i - 1] == 0));
+            }
         }
     }
 }
@@ -389,8 +490,11 @@ void drawGamefieldUpdate(uint8_t quadrant, uint8_t *gamefield, uint8_t attackPos
     } else {
         return;
     }
-
     hires_putc(baseX + x, baseY + y * 8, ROP_CPY, charCode);
+    if (c == FIELD_ATTACK) {
+        patchFieldHitLeftSea((uint8_t)(baseX + x), (uint8_t)(baseY + y * 8),
+                             (uint8_t)(x > 0 && gamefield[attackPos - 1] == 0));
+    }
 }
 
 void drawGamefieldCursor(uint8_t quadrant, uint8_t x, uint8_t y, uint8_t *gamefield, uint8_t blink) {
@@ -399,14 +503,27 @@ void drawGamefieldCursor(uint8_t quadrant, uint8_t x, uint8_t y, uint8_t *gamefi
     uint8_t baseY;
     uint8_t c;
     uint8_t charCode;
+    uint8_t hitX;
+    uint8_t cellY;
+    uint8_t rightHitX;
 
     pos = fieldX + quadrantOffset[quadrant];
     baseX = (uint8_t)(pos % WIDTH);  // WIDTH = 40
     baseY = (uint8_t)(pos / WIDTH);  // WIDTH = 40
     c = gamefield[y * 10 + x];
+    hitX = (uint8_t)(baseX + x);
+    cellY = (uint8_t)(baseY + y * 8);
 
     charCode = fieldCursorCode(baseX, x, c, blink);
-    hires_putc(baseX + x, baseY + y * 8, ROP_CPY, charCode);
+    hires_putc(hitX, cellY, ROP_CPY, charCode);
+    if (c == FIELD_ATTACK) {
+        patchFieldHitLeftSea(hitX, cellY,
+                             (uint8_t)(x > 0 && gamefield[y * 10 + x - 1] == 0));
+    } else if (c == 0 && x + 1 < FIELD_COLS
+               && gamefield[y * 10 + x + 1] == FIELD_ATTACK) {
+        rightHitX = (uint8_t)(baseX + x + 1);
+        patchFieldHitLeftSea(rightHitX, cellY, 1);
+    }
 }
 
 void drawBoard(uint8_t playerCount) {

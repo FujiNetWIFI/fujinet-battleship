@@ -171,8 +171,6 @@ void soundAttack() {
 }
 
 void soundPlaceShip() {
-    // Apple II version: similar to soundSelectMove() pattern
-    // Change from high to low tone
-    tone(35, 40, 20); // High tone (equivalent to frequency 96)
-    tone(40, 40, 0);  // Low tone (equivalent to frequency 81)
+    tone(35, 40, 20);
+    tone(40, 40, 0);
 }
