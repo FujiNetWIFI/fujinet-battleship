@@ -6,233 +6,185 @@
 
 extern const uint8_t drawerBorderFont[8][8];
 extern uint16_t quadrantOffset[];
-extern uint8_t fieldX;
-extern uint16_t currentPlayerCount;
-extern const uint8_t greenLineFont[];
-extern const uint8_t orangeLineFont[];
+
+/* index of drawerBorderFont */
+#define DRAWER_FONT_TOP           0
+#define DRAWER_FONT_BOTTOM        2
+#define DRAWER_FONT_VERT_OUT_R    4
+#define DRAWER_FONT_VERT_OUT_L    6
+static void blitDrawerBorderTile(uint8_t x, uint8_t y, uint8_t fontBaseEven)
+{
+    uint8_t idx = fontBaseEven + (x & 1);
+    hires_Draw(x, y, 1, FIELD_CELL_PX, ROP_CPY_NOFLIP,
+               (char *)&drawerBorderFont[idx][0]);
+}
+
+static void drawDrawerBorderTop(uint8_t x, uint8_t y, uint8_t length) {
+    uint8_t i;
+    for (i = 0; i < length; i++) {
+        blitDrawerBorderTile(x + i, y, DRAWER_FONT_TOP);
+    }
+}
+
+static void drawDrawerBorderBottom(uint8_t x, uint8_t y, uint8_t length) {
+    uint8_t i;
+
+    for (i = 0; i < length; i++) {
+        blitDrawerBorderTile(x + i, y, DRAWER_FONT_BOTTOM);
+    }
+}
+
+static void drawDrawerOuterVertSegment(uint8_t x, uint8_t y,
+                                       uint8_t fontIdx, uint8_t vLineMask) {
+    hires_Draw(x, y, 1, FIELD_CELL_PX, ROP_CPY_NOFLIP,
+                                            (char *)&drawerBorderFont[fontIdx][0]);
+    hires_Mask(x, y, 1, FIELD_CELL_PX, ROP_OR(vLineMask));
+}
+
+static void drawDrawer(uint8_t drawX, uint8_t y, uint8_t rightDrawer) {
+    uint8_t gx;
+    uint8_t outerCol;
+    uint8_t fontBase;
+    uint8_t vMask;
+
+    for (gx = 0; gx < DRAWER_COLS; gx++) {
+        hires_Mask(drawX + gx, y + DRAWER_BODY_Y, 1, DRAWER_BODY_HEIGHT,
+                   ROP_OR(((drawX + gx) % 2) ? ODD_BLUE : EVEN_BLUE));
+    }
+    drawDrawerBorderTop(drawX, y, DRAWER_COLS);
+    drawDrawerBorderBottom(drawX, y + DRAWER_BOTTOM_Y, DRAWER_COLS);
+    if (rightDrawer) {
+        outerCol = drawX + 3;
+        fontBase = DRAWER_FONT_VERT_OUT_R;
+        vMask = V_LINE_RIGHT;
+    } else {
+        outerCol = drawX - 1;
+        fontBase = DRAWER_FONT_VERT_OUT_L;
+        vMask = V_LINE_LEFT;
+    }
+    for (gx = 0; gx < DRAWER_OUTER_VERT_SEGS; gx++) {
+        uint8_t rowY = y + DRAWER_OUTER_VERT_Y + gx * FIELD_CELL_PX;
+        drawDrawerOuterVertSegment(outerCol, rowY, fontBase, vMask);
+    }
+}
+
+
+static void drawSeamCol(uint8_t ix, uint8_t y, uint8_t leftDrawer, uint8_t topPlayer) {
+    uint8_t playerSideMask = leftDrawer ? V_LINE_RIGHT : V_LINE_SEAM_LEFT;
+    uint8_t blueFill = (ix % 2) ? ODD_BLUE : EVEN_BLUE;
+
+    hires_Mask(ix, y, 1, DRAWER_IND_TOP_Y, ROP_CONST(playerSideMask));
+    hires_Mask(ix, y + 4, 1, 4, ROP_CONST(blueFill));
+    hires_Mask(ix, y + 4, 1, 4, ROP_OR(playerSideMask));
+
+    /* Drawer body zone: player side white, drawer side blue. */
+    hires_Mask(ix, y + DRAWER_BODY_Y, 1, DRAWER_BODY_HEIGHT, ROP_CONST(blueFill));
+    hires_Mask(ix, y + DRAWER_BODY_Y, 1, DRAWER_BODY_HEIGHT, ROP_OR(playerSideMask));
+
+    hires_Mask(ix, y + 72, 1, 4, ROP_CONST(blueFill));
+    hires_Mask(ix, y + 72, 1, 4, ROP_OR(playerSideMask));
+    hires_Mask(ix, y + DRAWER_IND_BOT_Y + 1, 1, 3, ROP_CONST(playerSideMask));
+
+    if (topPlayer) {
+        if (!leftDrawer) {
+            hires_Mask(ix, y - FIELD_BORDER_TOP_OFFSET, 1, 1,
+                       ROP_CONST(V_LINE_SEAM_LEFT));
+        } else {
+            hires_Mask(ix, y - FIELD_BORDER_TOP_OFFSET, 1, 1,
+                       ROP_OR(playerSideMask));
+        }
+        if (!leftDrawer) {
+            hires_Mask(ix, y + FIELD_BORDER_BOTTOM_Y, 1, 1,
+                       ROP_CONST(V_LINE_SEAM_LEFT));
+        } else {
+            hires_Mask(ix, y + FIELD_BORDER_BOTTOM_Y, 1, 1,
+                       ROP_OR(playerSideMask));
+        }
+    } else {
+        if (!leftDrawer) {
+            hires_Mask(ix, y - FIELD_BORDER_TOP_OFFSET, 1, 1,
+                       ROP_CONST(V_LINE_SEAM_LEFT));
+        } else {
+            hires_Mask(ix, y - FIELD_BORDER_TOP_OFFSET, 1, 1,
+                       ROP_OR(playerSideMask));
+        }
+    }
+}
 
 void drawBoardPlayer(uint8_t player, uint8_t playerCount) {
-    uint8_t x, y, ix, ox, left = 1, fy, eh, edgeSkip;
+    int     y;
+    uint8_t x, ix;
     uint8_t drawX;  // x start position of drawer
     uint8_t gx;
     uint16_t pos;
+    uint8_t topPlayer = (uint8_t)(player == 1 || player == 2);
+    uint8_t rightDrawer = (uint8_t)(player > 1 || (playerCount == 2 && player > 0));
+    uint8_t leftDrawer = !rightDrawer;
+    uint8_t fieldX = (uint8_t)(playerCount > 2 ? 4 : 10);
 
     pos = fieldX + quadrantOffset[player];
     x = (uint8_t)(pos % WIDTH);
     y = (uint8_t)(pos / WIDTH);
-
-    // right and left drawers
-    if (player > 1 || playerCount == 2 && player > 0) {
-        ox = x - 1;
-        ix = x + 10;
-        left = 0;
-        drawX = ix + 1; 
-    } else {
-        ix = x - 1;
-        ox = x + 10;
-        drawX = ix - 3;
-    }
-    if (player == 1 || player == 2) {
-        if (y - 9 < 0 || y - 9 >= 192) return;  // or skip
-        if (y + 80 >= 192) return;  // or skip
-        if (y + 82 >= 192) return;  // or skip
-        fy = y + 80;
-    } else {
-        fy = y - 8;
-    }
-    // Blue gamefield
-    for (gx=0; gx < 10; gx++) {
-        hires_Mask(x+gx, y, 1, 80, ROP_OR(((x+gx) % 2) ? ODD_BLUE : EVEN_BLUE));
-    }
-    edgeSkip = 0;
-    if (playerCount == 1) {
-        fy += 5;
-        edgeSkip = 4;
-    }
-    // Far edge
-    if (player || edgeSkip) {
-        if (player != 2 && !edgeSkip)
-            eh = 8;
-        else
-            eh = 3;
-    }
-    // Fill in the drawer
-    for (gx=0; gx < 3; gx++) {
-        hires_Mask(drawX+gx, y+8, 1, 64, ROP_OR(((drawX+gx) % 2) ? ODD_BLUE : EVEN_BLUE));
-    }
-    // Draw drawer borders
-    // Top border (3 characters wide, starting at y, above drawer)
-    drawDrawerBorder(drawX, y, 0, 3);
-    // Bottom border (3 characters wide, at y+8+64)
-    drawDrawerBorder(drawX, y + 8 + 64, 1, 3);
     
-    // Vertical borders (9 lines high to cover y+4 to y+4+64)
-    if (player > 1 || playerCount == 2 && player > 0) {
-        // Right drawer: right border (outer side, away from game field)
-        for (gx = 0; gx < 9; gx++) { 
-            drawDrawerBorder(drawX + 3, y + 4 + gx * 8, 2, 1);
-        }
-    } else {
-        // Left drawer: left border (outer side, away from game field)
-        for (gx = 0; gx < 9; gx++) {
-            drawDrawerBorder(drawX - 1, y + 4 + gx * 8, 3, 1);
-        }
+    if (topPlayer) {
+        if (y - 9 < 0 || y - 9 >= 192) return;
+        if (y + FIELD_BORDER_BOTTOM_Y >= 192) return;
+        if (y + 82 >= 192) return;
     }
-    // Draw white outline outside drawer borders
-    if (player > 1 || playerCount == 2 && player > 0) {
-        // Right drawer
-        // Top white line (1 pixel thick, above drawer top border, 4 columns wide)
-        hires_Mask(drawX, y + 3, 4, 1, ROP_WHITE);
-        
-        // Bottom white line (1 pixel thick, below drawer bottom border, 4 columns wide)
-        hires_Mask(drawX, y + 8 + 68, 4, 1, ROP_WHITE);
-        
-        // Right side white line (leftmost bit of column = screen right)
-        // Use ROP_OR to preserve drawer border drawing
-        for (gx = 0; gx < 9; gx++) {
-            hires_Mask(drawX + 3, y + 4 + gx * 8, 1, 8, ROP_OR(V_LINE_RIGHT));
-        }
-    } else {
-        // Left drawer
-        hires_Mask(drawX - 1, y + 3, 4, 1, ROP_WHITE);
-        
-        // Bottom white line (1 pixel thick, below drawer bottom border, 4 columns wide)
-        hires_Mask(drawX - 1, y + 8 + 68, 4, 1, ROP_WHITE);
-        // Left side white line (rightmost bit of column = screen left)
-        for (gx = 0; gx < 9; gx++) {
-            hires_Mask(drawX - 1, y + 4 + gx * 8, 1, 8, ROP_OR(V_LINE_LEFT));
-        }
+
+    // Blue gamefield
+    for (gx=0; gx < FIELD_COLS; gx++) {
+        hires_Mask(x+gx, y, 1, FIELD_HEIGHT_PX, ROP_OR(((x+gx) % 2) ? ODD_BLUE : EVEN_BLUE));
     }
     
     // Draw white lines inside game field
-    if (player == 1 || player == 2) {
-        // Top players: draw at bottom of game field
-        hires_Mask(x, y + 80, 10, 1, ROP_WHITE);
+    if (topPlayer) {
+        hires_Mask(x, y + FIELD_BORDER_BOTTOM_Y, FIELD_COLS, 1, ROP_WHITE);
     } else {
         // Bottom players: draw at top of game field
-        hires_Mask(x, y - 1, 10, 1, ROP_WHITE);
+        hires_Mask(x, y - FIELD_BORDER_TOP_OFFSET, FIELD_COLS, 1, ROP_WHITE);
     }
     
     // Vertical line (opposite side of drawer)
-    if (player > 1 || playerCount == 2 && player > 0) {
-        // Right players: draw at left edge of game field
-        if (player == 1 || player == 2) {
-            // Top players: extend line 1 line down at the end
-            for (gx = 0; gx < 10; gx++) {
-                hires_Mask(x - 1, y + gx * 8, 1, 8, ROP_OR(V_LINE_RIGHT));
+    if (rightDrawer) {
+        if (topPlayer) {
+            hires_Mask(x - 1, y - FIELD_BORDER_TOP_OFFSET, 1, 1, ROP_OR(V_LINE_RIGHT));
+            for (gx = 0; gx < FIELD_COLS; gx++) {
+                hires_Mask(x - 1, y + gx * FIELD_CELL_PX, 1, FIELD_CELL_PX, ROP_OR(V_LINE_RIGHT));
             }
-            hires_Mask(x - 1, y + 80, 1, 1, ROP_OR(V_LINE_RIGHT));
+            hires_Mask(x - 1, y + FIELD_BORDER_BOTTOM_Y, 1, 1, ROP_OR(V_LINE_RIGHT));
         } else {
-            // Bottom players: start 1 line up
-            hires_Mask(x - 1, y - 1, 1, 1, ROP_OR(V_LINE_RIGHT));
-            for (gx = 0; gx < 10; gx++) {
-                hires_Mask(x - 1, y + gx * 8, 1, 8, ROP_OR(V_LINE_RIGHT));
+            hires_Mask(x - 1, y - FIELD_BORDER_TOP_OFFSET, 1, 1, ROP_OR(V_LINE_RIGHT));
+            for (gx = 0; gx < FIELD_COLS; gx++) {
+                hires_Mask(x - 1, y + gx * FIELD_CELL_PX, 1, FIELD_CELL_PX, ROP_OR(V_LINE_RIGHT));
             }
         }
     } else {
-        // Left players: draw at right edge of game field
-        if (player == 1 || player == 2) {
-            // Top players: extend line 1 line down at the end
-            for (gx = 0; gx < 10; gx++) {
-                hires_Mask(x + 10, y + gx * 8, 1, 8, ROP_OR(V_LINE_LEFT));
+        if (topPlayer) {
+            hires_Mask(x + FIELD_COLS, y - FIELD_BORDER_TOP_OFFSET, 1, 1,ROP_OR(V_LINE_LEFT));
+            for (gx = 0; gx < FIELD_COLS; gx++) {
+                hires_Mask(x + FIELD_COLS, y + gx * FIELD_CELL_PX, 1, FIELD_CELL_PX, ROP_OR(V_LINE_LEFT));
             }
-            // Add 1 line at the bottom
-            hires_Mask(x + 10, y + 80, 1, 1, ROP_OR(V_LINE_LEFT));
+            hires_Mask(x + FIELD_COLS, y + FIELD_BORDER_BOTTOM_Y, 1, 1, ROP_OR(V_LINE_LEFT));
         } else {
-            // Bottom players: start 1 line up
-            hires_Mask(x + 10, y - 1, 1, 1, ROP_OR(V_LINE_LEFT));
-            for (gx = 0; gx < 10; gx++) {
-                hires_Mask(x + 10, y + gx * 8, 1, 8, ROP_OR(V_LINE_LEFT));
+            hires_Mask(x + FIELD_COLS, y - FIELD_BORDER_TOP_OFFSET, 1, 1, ROP_OR(V_LINE_LEFT));
+            for (gx = 0; gx < FIELD_COLS; gx++) {
+                hires_Mask(x + FIELD_COLS, y + gx * FIELD_CELL_PX, 1, FIELD_CELL_PX, ROP_OR(V_LINE_LEFT));
             }
         }
     }
-}
 
-void drawDrawerBorder(uint8_t x, uint8_t y, uint8_t type, uint8_t length) {
-    uint8_t fontIndex;
-    uint8_t i;
-    
-    for (i = 0; i < length; i++) {
-        uint8_t actualX = x + i;
-        // Select font based on actual x coordinate (ODD/EVEN) and type
-        if (type < 2) {
-            // Horizontal borders (top/bottom)
-            fontIndex = (actualX % 2) ? (type * 2 + 1) : (type * 2);
-        } else {
-            if (type == 2) {
-                fontIndex = 4;
-            } else {
-                // Vertical borders (left/right)
-                fontIndex = 6;
-            }
-        }
-        hires_Draw(actualX, y, 1, 8, ROP_CPY_NOFLIP, (char*)&drawerBorderFont[fontIndex][0]);
-    }
-}
-
-// Helper function to draw horizontal player borders (drawer and game field)
-void drawPlayerBorders(uint8_t player, bool active) {
-    uint8_t x, y, drawX, gx;
-    uint16_t pos;
-    uint8_t playerCount = currentPlayerCount;
-    
-    // Color patterns for borders
-    const uint8_t *horizPattern = active ? orangeLineFont : greenLineFont;
-    
-    pos = fieldX + quadrantOffset[player];
-    x = (uint8_t)(pos % WIDTH);
-    y = (uint8_t)(pos / WIDTH);
-    
-    // Determine drawer position (same as drawBoard)
-    if (player > 1 || playerCount == 2 && player > 0) {
-        drawX = x + 11;  // Right drawer: ix + 1, where ix = x + 10
+    // right and left drawers
+    if (rightDrawer) {
+        ix = x + FIELD_COLS;
+        drawX = ix + 1; 
     } else {
-        drawX = x - 4;   // Left drawer: ix - 3, where ix = x - 1
+        ix = x - 1;
+        drawX = ix - DRAWER_COLS;
     }
-    
-    // Draw drawer horizontal borders (outside white lines)
-    if (player > 1 || playerCount == 2 && player > 0) {
-        // Right drawer
-        // Top horizontal line (1 pixel thick, above drawer top border, 4 columns wide)
-        for (gx = 0; gx < 4; gx++) {
-            uint8_t actualX = drawX + gx;
-            uint8_t fontIndex = (actualX % 2);
-            hires_Draw(actualX, y + 3, 1, 1, ROP_CPY_NOFLIP, (char*)&horizPattern[fontIndex]);
-        }
-        // Bottom horizontal line (1 pixel thick, below drawer bottom border, 4 columns wide)
-        for (gx = 0; gx < 4; gx++) {
-            uint8_t actualX = drawX + gx;
-            uint8_t fontIndex = (actualX % 2);
-            hires_Draw(actualX, y + 8 + 68, 1, 1, ROP_CPY_NOFLIP, (char*)&horizPattern[fontIndex]);
-        }
-    } else {
-        // Left drawer
-        for (gx = 0; gx < 4; gx++) {
-            uint8_t actualX = drawX - 1 + gx;
-            uint8_t fontIndex = (actualX % 2);
-            hires_Draw(actualX, y + 3, 1, 1, ROP_CPY_NOFLIP, (char*)&horizPattern[fontIndex]);
-        }
-        // Bottom horizontal line (1 pixel thick, below drawer bottom border, 4 columns wide)
-        for (gx = 0; gx < 4; gx++) {
-            uint8_t actualX = drawX - 1 + gx;
-            uint8_t fontIndex = (actualX % 2);
-            hires_Draw(actualX, y + 8 + 68, 1, 1, ROP_CPY_NOFLIP, (char*)&horizPattern[fontIndex]);
-        }
-    }
-    // Draw game field horizontal border (opposite side of player name)
-    if (player == 1 || player == 2) {
-        // Top players: draw at bottom of game field
-        for (gx = 0; gx < 10; gx++) {
-            uint8_t actualX = x + gx;
-            uint8_t fontIndex = (actualX % 2);
-            hires_Draw(actualX, y + 80, 1, 1, ROP_CPY_NOFLIP, (char*)&horizPattern[fontIndex]);
-        }
-    } else {
-        // Bottom players: draw at top of game field
-        for (gx = 0; gx < 10; gx++) {
-            uint8_t actualX = x + gx;
-            uint8_t fontIndex = (actualX % 2);
-            hires_Draw(actualX, y - 1, 1, 1, ROP_CPY_NOFLIP, (char*)&horizPattern[fontIndex]);
-        }
-    }
+    drawSeamCol(ix, y, leftDrawer, topPlayer);
+    drawDrawer(drawX, y, rightDrawer);
+    /* Restore indicator white bands after top/bottom border blit. */
+    hires_Mask(drawX - 1, y + DRAWER_IND_TOP_Y, DRAWER_FIXED_WHITE_WIDTH, 1, ROP_WHITE);
+    hires_Mask(drawX - 1, y + DRAWER_IND_BOT_Y, DRAWER_FIXED_WHITE_WIDTH, 1, ROP_WHITE);
 }

@@ -3,25 +3,47 @@
 
 #include <joystick.h>
 
-// Screen dimensions for platform
-// from coco ver.
-
 #define WIDTH 40
 #define HEIGHT 24
 
-// Other platform specific constnats
 #define GAMEOVER_PROMPT_Y HEIGHT - 2
 #define LOGO_Y 2
 
 // Hires / board drawing (graphics.c, graphicsBoard.c)
+// ROP_CONST fill bytes (hires_Mask)
+#define HIRES_BLACK 0x00
+#define EVEN_BLUE   0b11010101  // Pattern for even x coordinates
+#define ODD_BLUE    0b10101010  // Pattern for odd x coordinates
+// hires_Mask ROP_AND: clear D6 (right-edge pixel within the byte) 
+#define HIRES_AND_CLEAR_D6  0xBF
 
-// Checkerboard fill for gamefield (hires_Mask ROP_CONST)
-#define EVEN_BLUE  0b11010101  // Pattern for even x coordinates
-#define ODD_BLUE   0b10101010  // Pattern for odd x coordinates
+// Player field (10x10 cells, 8px per cell row)
+#define FIELD_COLS                10
+#define FIELD_CELL_PX             8
+#define FIELD_HEIGHT_PX           80
+#define FIELD_BORDER_BOTTOM_Y     80
+#define FIELD_BORDER_TOP_OFFSET   1
 
-// White outline OR-masks (single-column hires_Mask)
-#define V_LINE_LEFT   0x07
-#define V_LINE_RIGHT  0xf0
+// Drawer tray geometry
+#define DRAWER_COLS               3
+#define DRAWER_BODY_Y             8
+#define DRAWER_BODY_HEIGHT        64
+#define DRAWER_BOTTOM_Y           (DRAWER_BODY_Y + DRAWER_BODY_HEIGHT)
+#define DRAWER_OUTER_VERT_Y       4
+#define DRAWER_OUTER_VERT_SEGS    9
+
+// Drawer indicator rows (fixed white and color-shift)
+#define DRAWER_FIXED_WHITE_WIDTH  5
+#define DRAWER_IND_TOP_Y          3
+#define DRAWER_IND_BOT_Y          (DRAWER_BODY_Y + 68)
+#define DRAWER_IND_SHIFT_TOP_Y    2
+#define DRAWER_IND_SHIFT_BOT_Y    (DRAWER_BODY_Y + 69)
+#define DRAWER_COLOR_IND_WIDTH    4
+
+// Seam/outer vertical line masks
+#define V_LINE_LEFT         0x07
+#define V_LINE_RIGHT        0xf0
+#define V_LINE_SEAM_LEFT    0x03
 
 #undef ESCAPE
 #define ESCAPE "BREAK"
