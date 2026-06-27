@@ -7,7 +7,7 @@
 #################################################################
 
 # TO BUILD: 		make <platform>
-# PLATFORMS: 		apple2 atari coco coco3 msdos
+# PLATFORMS: 		apple2 atari coco coco3 msdos dragon
 # PLATFORMS TODO:   c64 adam msxrom
 
 # C64 SPECIFIC:
@@ -34,7 +34,10 @@ endef
 
 PRODUCT = fbs
 PRODUCT_UPPER = FBS
-PLATFORMS = coco atari apple2 c64
+PLATFORMS = coco atari apple2 c64 dragon
+
+PLATFORM_COMBOS = \
+  dragon+=coco
 
 # Use "make-exp msdos" to build msdos.
 # That version uses fujinet-lib-experimental.
@@ -62,15 +65,26 @@ CFLAGS_EXTRA_COCO = \
 	-Wno-assign-in-condition \
 	--no-relocate \
 	--intermediate
+COCO_ORG = 1000
 
 ifeq ($(MAKE_COCO3),COCO3)
 # 	Coco 3
 	CFLAGS_EXTRA_COCO += -DCOCO3
-	LDFLAGS_EXTRA_COCO = --limit=7800 --org=1000
+	LDFLAGS_EXTRA_COCO = --limit=7800 --org=$(COCO_ORG)
 else
 # 	Coco 1/2	
-	LDFLAGS_EXTRA_COCO = --limit=5ff0 --org=1000
+	LDFLAGS_EXTRA_COCO = --limit=5ff0 --org=$(COCO_ORG)
 endif
+
+## Dragon specific flags (cmoc)
+CFLAGS_EXTRA_DRAGON = \
+	-Wno-assign-in-condition \
+	--no-relocate \
+	--intermediate \
+	-DDRAGON \
+	--dragon
+LDFLAGS_EXTRA_DRAGON = --limit=5ff0 --org=$(COCO_ORG) --dragon
+
 
 ifeq ($(VICE),1)
 # VICE C64 emulator specific flags
@@ -85,7 +99,6 @@ COCO_DISK = $(R2R_PRODUCT).dsk
 # Support 'make coco3'
 coco3:
 	make coco MAKE_COCO3=COCO3
-
 
 # Apple II specific flags (cc65)
 CFLAGS_EXTRA_APPLE2 += -Os
