@@ -51,6 +51,10 @@ lit_comma: DATA 44
 
     CONST LEN_HTTPS = 36
 
+    ' Lobby appkey: creator 1 / app 1, key = this game's registered slot.
+    ' See fujinet-battleship/src/misc.h AK_LOBBY_KEY_SERVER.
+    CONST AK_LOBBY_KEY_SERVER = 5
+
 ' ---------------------------------------------------------------------------
 ' Globals
 ' ---------------------------------------------------------------------------
@@ -66,6 +70,9 @@ lit_comma: DATA 44
 
     DIM df_pos, df_len, #df_color, df_i, df_c, df_stop
     DIM #df_src
+
+    ' split_room_url locals (see procedure below)
+    DIM sp_i, sp_found, sp_ok, sp_j, sp_k, sp_c, sp_valid, sp_m
 
     DIM cu_i
     DIM pn_val, pn_h, pn_t, pn_o, pn_started
@@ -136,7 +143,7 @@ END
 compose_url: PROCEDURE
     #fn_txlen = 0
     #fn_src = VARPTR lit_n_colon(0) : fn_len = 2 : GOSUB fn_putstr
-    #fn_src = VARPTR lit_https(0) : fn_len = LEN_HTTPS : GOSUB fn_putstr
+    #fn_src = SC_ENDPT : ls_max = 65 : GOSUB fn_strlen : GOSUB fn_putstr
 
     IF url_path = 0 THEN
         #fn_src = VARPTR lit_tables(0) : fn_len = 6 : GOSUB fn_putstr
@@ -169,6 +176,109 @@ compose_url: PROCEDURE
         #fn_src = SC_NAME : ls_max = 9 : GOSUB fn_strlen : GOSUB fn_putstr
         #fn_src = VARPTR lit_abinv2(0) : fn_len = 10 : GOSUB fn_putstr
     END IF
+END
+
+' ---------------------------------------------------------------------------
+' split_room_url: given a lobby-supplied "https://host/?table=xyz" value
+' already sitting in SC_ENDPT with its length in fn_len (as left by
+' appkey_read), split it into the bare endpoint (SC_ENDPT, truncated at
+' the '?') and the table id (SC_TABLE). Mirrors the C clients'
+' welcomeActionVerifyServerDetails() '?' scan. Leaves SC_TABLE empty (a
+' leading NUL) if there's no '?', the query isn't "table=...", or the id
+' contains anything other than A-Z/a-z/0-9 -- it goes straight into a
+' rebuilt query string unescaped, same reasoning as the username check
+' above.
+' ---------------------------------------------------------------------------
+split_room_url: PROCEDURE
+    POKE SC_TABLE, 0
+
+    sp_found = 255 ' sentinel: not found
+    sp_i = 0
+    WHILE sp_i < fn_len
+        IF (PEEK(SC_ENDPT + sp_i) AND 255) = 63 THEN ' '?'
+            sp_found = sp_i
+            EXIT WHILE
+        END IF
+        sp_i = sp_i + 1
+    WEND
+    IF sp_found = 255 THEN RETURN
+
+    ' Truncate the endpoint at the '?' regardless of what follows.
+    POKE (SC_ENDPT + sp_found), 0
+
+    ' Require "table=" (6 bytes) right after the '?'.
+    sp_ok = 0
+    IF sp_found + 7 <= fn_len THEN
+        sp_ok = 1
+        IF (PEEK(SC_ENDPT + sp_found + 1) AND 255) <> 116 THEN sp_ok = 0 ' t
+        IF (PEEK(SC_ENDPT + sp_found + 2) AND 255) <> 97  THEN sp_ok = 0 ' a
+        IF (PEEK(SC_ENDPT + sp_found + 3) AND 255) <> 98  THEN sp_ok = 0 ' b
+        IF (PEEK(SC_ENDPT + sp_found + 4) AND 255) <> 108 THEN sp_ok = 0 ' l
+        IF (PEEK(SC_ENDPT + sp_found + 5) AND 255) <> 101 THEN sp_ok = 0 ' e
+        IF (PEEK(SC_ENDPT + sp_found + 6) AND 255) <> 61  THEN sp_ok = 0 ' =
+    END IF
+    IF sp_ok = 0 THEN RETURN
+
+    ' Copy the id: up to 8 bytes, stopping at NUL or '&'.
+    sp_j = sp_found + 7
+    sp_k = 0
+    WHILE sp_k < 8 AND sp_j < fn_len
+        sp_c = PEEK(SC_ENDPT + sp_j) AND 255
+        IF sp_c = 0 OR sp_c = 38 THEN EXIT WHILE ' NUL or '&'
+        POKE (SC_TABLE + sp_k), sp_c
+        sp_k = sp_k + 1
+        sp_j = sp_j + 1
+    WEND
+    POKE (SC_TABLE + sp_k), 0
+
+    ' Validate: A-Z/a-z/0-9 only.
+    sp_valid = 1
+    FOR sp_m = 0 TO sp_k - 1
+        sp_c = PEEK(SC_TABLE + sp_m) AND 255
+        IF (sp_c < 65 OR sp_c > 90) AND (sp_c < 97 OR sp_c > 122) AND (sp_c < 48 OR sp_c > 57) THEN sp_valid = 0
+    NEXT sp_m
+    IF sp_valid = 0 THEN POKE SC_TABLE, 0
+END
+
+' ---------------------------------------------------------------------------
+' write_room_appkey: persist SC_ENDPT + "?table=" + SC_TABLE back to the
+' lobby server appkey slot, so a reboot without going back through the
+' lobby rejoins the same room (mirrors the C clients' "Update server app
+' key in case of reboot"). Builds the payload directly in FN_TX and writes
+' it from there -- appkey_write's byte-by-byte copy from #fn_src into
+' FN_TX is a safe no-op when #fn_src is FN_TX itself.
+' ---------------------------------------------------------------------------
+write_room_appkey: PROCEDURE
+    #fn_txlen = 0
+    #fn_src = SC_ENDPT : ls_max = 65 : GOSUB fn_strlen : GOSUB fn_putstr
+    #fn_src = VARPTR lit_qtable(0) : fn_len = 7 : GOSUB fn_putstr
+    #fn_src = SC_TABLE : ls_max = 9 : GOSUB fn_strlen : GOSUB fn_putstr
+
+    ak_creator_lo = 1 : ak_creator_hi = 0 : ak_app = 1
+    ak_key = AK_LOBBY_KEY_SERVER : ak_mode = 1
+    GOSUB appkey_open
+    IF fn_ok THEN
+        fn_len = #fn_txlen : #fn_src = FN_TX
+        GOSUB appkey_write
+        GOSUB appkey_close
+    END IF
+END
+
+' ---------------------------------------------------------------------------
+' clear_room_appkey: blank the lobby server appkey slot on a deliberate
+' leave, so a later reboot lands on table select instead of silently
+' rejoining a table the player just quit.
+' ---------------------------------------------------------------------------
+clear_room_appkey: PROCEDURE
+    ak_creator_lo = 1 : ak_creator_hi = 0 : ak_app = 1
+    ak_key = AK_LOBBY_KEY_SERVER : ak_mode = 1
+    GOSUB appkey_open
+    IF fn_ok THEN
+        fn_len = 0 : #fn_src = FN_TX
+        GOSUB appkey_write
+        GOSUB appkey_close
+    END IF
+    POKE SC_TABLE, 0
 END
 
 ' ===========================================================================
@@ -212,6 +322,44 @@ boot_start:
         END IF
     END IF
     IF gs_i = 0 THEN GOSUB name_entry_screen
+
+' ---------------------------------------------------------------------------
+' Room: check the lobby server appkey (creator 1 / app 1 / key
+' AK_LOBBY_KEY_SERVER). If the lobby wrote a room there, split it into
+' SC_ENDPT/SC_TABLE and skip straight past table select. Seed the
+' compiled-in default endpoint first so SC_ENDPT is always valid even if
+' the appkey is empty or the read fails -- compose_url relies on it from
+' here on for every request, not just /tables.
+' ---------------------------------------------------------------------------
+    FOR gs_i = 0 TO LEN_HTTPS - 1
+        POKE (SC_ENDPT + gs_i), PEEK(VARPTR lit_https(0) + gs_i) AND 255
+    NEXT gs_i
+    POKE (SC_ENDPT + LEN_HTTPS), 0
+    POKE SC_TABLE, 0
+
+    FOR ak_try = 0 TO 1
+        ak_creator_lo = 1 : ak_creator_hi = 0 : ak_app = 1
+        ak_key = AK_LOBBY_KEY_SERVER : ak_mode = 0
+        GOSUB appkey_open
+        IF fn_ok THEN EXIT FOR
+    NEXT ak_try
+    IF fn_ok THEN
+        #fn_src = SC_ENDPT : ls_max = 65 : GOSUB appkey_read
+        GOSUB appkey_close
+        IF fn_len > 0 THEN
+            GOSUB split_room_url
+        ELSE
+            ' appkey_read always NUL-terminates at fn_len, even when
+            ' empty, which would otherwise wipe out the default just
+            ' seeded above -- restore it.
+            FOR gs_i = 0 TO LEN_HTTPS - 1
+                POKE (SC_ENDPT + gs_i), PEEK(VARPTR lit_https(0) + gs_i) AND 255
+            NEXT gs_i
+            POKE (SC_ENDPT + LEN_HTTPS), 0
+        END IF
+    END IF
+
+    IF (PEEK(SC_TABLE) AND 255) <> 0 THEN GOTO table_joined
 
 ' ===========================================================================
 ' Table select (re-entered after leaving a table)
@@ -296,6 +444,11 @@ ts_input:
         POKE (SC_TABLE + gs_i), PEEK(#tmp_addr + TBL_ID + gs_i) AND 255
     NEXT gs_i
 
+    ' Update the lobby server appkey so a reboot without going back
+    ' through the lobby rejoins this table.
+    GOSUB write_room_appkey
+
+table_joined:
 ' ===========================================================================
 ' In a table: poll /state (or submit a pending ready/place/attack action in
 ' its place) and dispatch on status. A full CLS + board_init happens only
@@ -902,6 +1055,7 @@ im_loop:
         url_path = 5 : GOSUB compose_url
         #net_readlen = 8
         GOSUB api_call
+        GOSUB clear_room_appkey
         want_leave = 1
     END IF
 im_done:
