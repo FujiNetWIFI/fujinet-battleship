@@ -371,3 +371,18 @@ appkey_close: PROCEDURE
     #fn_txlen = 0
     GOSUB fn_transact
 END
+
+' Erase the appkey selected by ak_creator_lo/hi + ak_app + ak_key (caller
+' sets those; ak_mode is forced to write here) by storing a zero-length
+' value -- used both for a deliberate clear (leaving a table) and for
+' blanking a key whose stored content failed validation, so a corrupt
+' value can't keep coming back boot after boot.
+appkey_erase: PROCEDURE
+    ak_mode = 1
+    GOSUB appkey_open
+    IF fn_ok THEN
+        fn_len = 0 : #fn_src = FN_TX
+        GOSUB appkey_write
+        GOSUB appkey_close
+    END IF
+END

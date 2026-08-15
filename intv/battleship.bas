@@ -92,6 +92,7 @@ lit_comma: DATA 44
 
     DIM tg_x, tg_y, tg_newx, tg_newy, tg_moved, tg_timeleft, tg_framecount
     DIM tc_q, tc_state, tc_color, tc_field
+    DIM ta_pos, ta_step, ta_q, ta_frames, ta_ran, new_result
 
 ' ---------------------------------------------------------------------------
 ' draw_field: render df_len ASCII bytes from #df_src onto the screen at
@@ -203,6 +204,17 @@ split_room_url: PROCEDURE
     WEND
     IF sp_found = 255 THEN RETURN
 
+    ' A '?' at position 0 means an empty endpoint; and the endpoint portion
+    ' must be printable ASCII ('!'..'~') throughout -- binary garbage that
+    ' happens to contain "?table=<alnum>" would otherwise pass every check
+    ' below and go straight into a URL. (The 0-guard also keeps the FOR
+    ' safe: IntyBASIC FOR bodies run at least once even on an empty range.)
+    IF sp_found = 0 THEN RETURN
+    FOR sp_m = 0 TO sp_found - 1
+        sp_c = PEEK(SC_ENDPT + sp_m) AND 255
+        IF sp_c < 33 OR sp_c > 126 THEN RETURN
+    NEXT sp_m
+
     ' Truncate the endpoint at the '?' regardless of what follows.
     POKE (SC_ENDPT + sp_found), 0
 
@@ -271,14 +283,23 @@ END
 ' ---------------------------------------------------------------------------
 clear_room_appkey: PROCEDURE
     ak_creator_lo = 1 : ak_creator_hi = 0 : ak_app = 1
-    ak_key = AK_LOBBY_KEY_SERVER : ak_mode = 1
-    GOSUB appkey_open
-    IF fn_ok THEN
-        fn_len = 0 : #fn_src = FN_TX
-        GOSUB appkey_write
-        GOSUB appkey_close
-    END IF
+    ak_key = AK_LOBBY_KEY_SERVER
+    GOSUB appkey_erase
     POKE SC_TABLE, 0
+END
+
+' ---------------------------------------------------------------------------
+' seed_default_endpoint: (re)copy the compiled-in default endpoint into
+' SC_ENDPT. compose_url relies on SC_ENDPT for every request, so this runs
+' at boot before the room appkey is consulted, and again whenever that key
+' turns out to be empty or corrupt (either way the read has already
+' clobbered the buffer).
+' ---------------------------------------------------------------------------
+seed_default_endpoint: PROCEDURE
+    FOR gs_i = 0 TO LEN_HTTPS - 1
+        POKE (SC_ENDPT + gs_i), PEEK(VARPTR lit_https(0) + gs_i) AND 255
+    NEXT gs_i
+    POKE (SC_ENDPT + LEN_HTTPS), 0
 END
 
 ' ===========================================================================
@@ -319,6 +340,15 @@ boot_start:
                 IF gs_char >= 97 AND gs_char <= 122 THEN gs_char = gs_char - 32
                 IF (gs_char < 65 OR gs_char > 90) AND (gs_char < 48 OR gs_char > 57) THEN gs_i = 0
             NEXT gs_j
+            IF gs_i = 0 THEN
+                ' Content present but invalid -> corrupt. Blank the key now
+                ' rather than leave the bad value to greet every later boot;
+                ' name_entry_screen rewrites it on success, but a power-off
+                ' mid-entry would otherwise keep the corrupt value. (An
+                ' empty key or a failed read is NOT corrupt -- no erase.)
+                ak_creator_lo = 1 : ak_creator_hi = 0 : ak_app = 1 : ak_key = 0
+                GOSUB appkey_erase
+            END IF
         END IF
     END IF
     IF gs_i = 0 THEN GOSUB name_entry_screen
@@ -331,10 +361,7 @@ boot_start:
 ' the appkey is empty or the read fails -- compose_url relies on it from
 ' here on for every request, not just /tables.
 ' ---------------------------------------------------------------------------
-    FOR gs_i = 0 TO LEN_HTTPS - 1
-        POKE (SC_ENDPT + gs_i), PEEK(VARPTR lit_https(0) + gs_i) AND 255
-    NEXT gs_i
-    POKE (SC_ENDPT + LEN_HTTPS), 0
+    GOSUB seed_default_endpoint
     POKE SC_TABLE, 0
 
     FOR ak_try = 0 TO 1
@@ -348,14 +375,20 @@ boot_start:
         GOSUB appkey_close
         IF fn_len > 0 THEN
             GOSUB split_room_url
+            IF (PEEK(SC_TABLE) AND 255) = 0 THEN
+                ' The key held content that didn't parse or validate ->
+                ' corrupt. Erase it so it can't keep coming back, and
+                ' restore the default endpoint the read clobbered --
+                ' otherwise every /tables request from here on would be
+                ' aimed at whatever garbage the key held.
+                GOSUB clear_room_appkey
+                GOSUB seed_default_endpoint
+            END IF
         ELSE
             ' appkey_read always NUL-terminates at fn_len, even when
             ' empty, which would otherwise wipe out the default just
             ' seeded above -- restore it.
-            FOR gs_i = 0 TO LEN_HTTPS - 1
-                POKE (SC_ENDPT + gs_i), PEEK(VARPTR lit_https(0) + gs_i) AND 255
-            NEXT gs_i
-            POKE (SC_ENDPT + LEN_HTTPS), 0
+            GOSUB seed_default_endpoint
         END IF
     END IF
 
@@ -534,27 +567,48 @@ tl_loop:
                 poll_wait = 30
             END IF
         ELSE
+            ' status (MISS/HIT/SUNK) reflects the *last* attack's result and
+            ' can legitimately repeat across several polls if no one has
+            ' fired since -- pair it with lastAttackPos so the launch
+            ' animation and result sound fire exactly once per real event,
+            ' not once per poll it's visible. Detected BEFORE
+            ' render_game_board runs: the animation colour-cycles the
+            ' attacked cells while they still show their pre-attack state,
+            ' and the diff render right after is what reveals the outcome.
+            new_result = 0
+            ta_ran = 0
+            IF cur_status = STATUS_MISS OR cur_status = STATUS_HIT OR cur_status = STATUS_SUNK THEN
+                rb_lastattack = PEEK(FN_RX + GAME_LASTATTACK) AND 255
+                IF cur_status <> prev_result_status OR rb_lastattack <> prev_result_pos THEN
+                    new_result = 1
+                    prev_result_status = cur_status
+                    prev_result_pos = rb_lastattack
+                    ' ships_drawn=0 means the next render is the full first
+                    ' paint (every shadow cell still holds the 255 sentinel)
+                    ' -- a reconnect, not a live launch: skip the animation.
+                    IF ships_drawn THEN
+                        ta_pos = rb_lastattack
+                        GOSUB torpedo_anim
+                        ta_ran = 1
+                    END IF
+                END IF
+            END IF
+
             GOSUB render_game_board
+            ' Finish the launch-noise fade over the just-revealed outcome
+            ' (render_game_board has no WAITs, so the reveal is immediate).
+            IF ta_ran THEN GOSUB torpedo_tail
             GOSUB render_panel
             #df_src = FN_RX + GAME_PROMPT : df_pos = STATUS_ROW : df_len = ROWCELLS : #df_color = COL_TEXT
             GOSUB draw_field
 
-            ' status (MISS/HIT/SUNK) reflects the *last* attack's result and
-            ' can legitimately repeat across several polls if no one has
-            ' fired since -- pair it with lastAttackPos so the sound plays
-            ' exactly once per real event, not once per poll it's visible.
-            IF cur_status = STATUS_MISS OR cur_status = STATUS_HIT OR cur_status = STATUS_SUNK THEN
-                rb_lastattack = PEEK(FN_RX + GAME_LASTATTACK) AND 255
-                IF cur_status <> prev_result_status OR rb_lastattack <> prev_result_pos THEN
-                    IF cur_status = STATUS_MISS THEN
-                        GOSUB sound_miss
-                    ELSEIF cur_status = STATUS_HIT THEN
-                        GOSUB sound_hit
-                    ELSE
-                        GOSUB sound_sink
-                    END IF
-                    prev_result_status = cur_status
-                    prev_result_pos = rb_lastattack
+            IF new_result THEN
+                IF cur_status = STATUS_MISS THEN
+                    GOSUB sound_miss
+                ELSEIF cur_status = STATUS_HIT THEN
+                    GOSUB sound_hit
+                ELSE
+                    GOSUB sound_sink
                 END IF
             END IF
 
@@ -620,7 +674,16 @@ render_gameover: PROCEDURE
         ds_bq = active_player : ds_base = GAME_MYSHIPS + 5 : ds_color = BCOL_SUNKSHIP
         GOSUB draw_ship_set
     END IF
-    #df_src = FN_RX + GAME_PROMPT : df_pos = STATUS_ROW : df_len = ROWCELLS : #df_color = COL_HILITE
+    ' The winning message flows across the bottom two rows (10-11) so the
+    ' full 33-byte wire prompt fits instead of truncating at 20 characters.
+    ' Row 10 overlaps the bottom board row of q0/q3 -- fine, the game is
+    ' over and the final board state was already drawn. df_len stays 33
+    ' (the prompt field's exact width): a full-width prompt has no NUL, so
+    ' a 40-byte read would render the status/playerStatus header bytes as
+    ' glyphs. The pre-clear blanks the 7 cells past the field instead.
+    PRINT AT STATUS_ROW - 20 COLOR COL_TEXT, "                    "
+    PRINT AT STATUS_ROW COLOR COL_TEXT, "                    "
+    #df_src = FN_RX + GAME_PROMPT : df_pos = STATUS_ROW - 20 : df_len = 33 : #df_color = COL_HILITE
     GOSUB draw_field
 END
 
@@ -751,7 +814,9 @@ END
 ' Sets has_targeted + atk_pos on a confirmed attack.
 ' ===========================================================================
 targeting: PROCEDURE
-    tg_x = 0 : tg_y = 0
+    ' tg_x/tg_y deliberately NOT reset here: the cursor resumes from
+    ' wherever the previous turn left it (confirmed shot, timeout, or
+    ' menu exit alike). Boot-time RAM clearing covers the first turn.
     has_targeted = 0
     inp_lock = 0
     GOSUB targeting_draw_cursor
@@ -867,6 +932,64 @@ END
 ' but cross-segment GOSUB/GOTO compiles to ordinary absolute CP-1610
 ' jumps/calls, so that's only a bookkeeping caveat, not a correctness one.
     ASM ORG $D000
+
+' ===========================================================================
+' torpedo_anim: torpedo-launch animation. Colour-cycle the just-attacked
+' cell ta_pos (0-99) through the 7 STIC primaries once, with white noise
+' decaying to silence over the cycle, on every quadrant whose gamefield
+' changed at that cell -- exactly the cells render_game_board is about to
+' repaint, so no animation colour can survive as a stale cell (a quadrant
+' the shot didn't change is never touched). Runs between a new-result
+' detection and the diff render in tl_loop; covers both our own shots and
+' opponents' (including hits landing on our board -- quadrant 0's changed
+' cell animates too).
+' ===========================================================================
+torpedo_anim: PROCEDURE
+    FOR ta_step = 0 TO 6
+        ' First half of the noise decay: SND_VOL (12) down to 6 across the
+        ' 7 colour steps. The second half runs in torpedo_tail, AFTER
+        ' render_game_board has revealed the outcome -- stretching the
+        ' full fade to ~2x the colour cycle without delaying the reveal.
+        snd_nvol = SND_VOL - ta_step
+        GOSUB sound_noise_set
+        FOR ta_q = 0 TO 3
+            IF ta_q < cur_pc THEN
+                ' Same guard as render_game_board: a still-placing player's
+                ' record carries no valid gamefield bytes.
+                IF (PEEK(player_addr(ta_q) + PL_STATUS) AND 255) <> PSTATUS_PLACE_SHIPS THEN
+                    IF (PEEK(player_addr(ta_q) + PL_GAMEFIELD + ta_pos) AND 255) <> (PEEK(SC_PREVFIELD + ta_q * 100 + ta_pos) AND 255) THEN
+                        bc_bq = ta_q
+                        bc_x = ta_pos % 10
+                        bc_y = ta_pos / 10
+                        bc_color = ta_step
+                        GOSUB board_cell
+                    END IF
+                END IF
+            END IF
+        NEXT ta_q
+        FOR ta_frames = 1 TO 3
+            WAIT
+        NEXT ta_frames
+    NEXT ta_step
+END
+
+' ===========================================================================
+' torpedo_tail: second half of the launch-noise decay (5 down to silence),
+' run right after render_game_board has revealed the outcome so the fade
+' plays out over the revealed board instead of delaying it. Always paired
+' with torpedo_anim (which leaves the noise running at volume 6) via
+' tl_loop's ta_ran flag; owns the sound_noise_off.
+' ===========================================================================
+torpedo_tail: PROCEDURE
+    FOR ta_step = 1 TO 6
+        snd_nvol = 6 - ta_step
+        GOSUB sound_noise_set
+        FOR ta_frames = 1 TO 3
+            WAIT
+        NEXT ta_frames
+    NEXT ta_step
+    GOSUB sound_noise_off
+END
 
 ' ===========================================================================
 ' handle_placement: place all 5 ships (sizes 5,4,3,3,2, fixed order). Each
@@ -1025,7 +1148,14 @@ END
 ' ===========================================================================
 ingame_menu: PROCEDURE
     im_sel = 0
-    inp_lock = 0
+    ' The Clear press that opened this menu is still held on entry -- with
+    ' inp_lock at 0, the "Clear again cancels" check below would fire on
+    ' that same press and close the menu the instant it opens. Wait for
+    ' release, then hold input off a few frames to ride out key bounce.
+    WHILE CONT1.KEY = 10
+        WAIT
+    WEND
+    inp_lock = 4
 im_loop:
     PRINT AT STATUS_ROW - 40 COLOR COL_TEXT, "                    "
     PRINT AT STATUS_ROW - 20 COLOR COL_TEXT, "                    "
@@ -1060,6 +1190,11 @@ im_loop:
     END IF
 im_done:
     prev_status = 255 ' force a full CLS/board_init redraw on return
+    ' Same problem in reverse: a Clear-to-cancel still held when this
+    ' returns would hit tl_input's KEY=10 check and reopen the menu.
+    WHILE CONT1.KEY = 10
+        WAIT
+    WEND
 END
 
 ' ===========================================================================

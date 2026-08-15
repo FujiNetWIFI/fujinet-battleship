@@ -134,3 +134,23 @@ END
 sound_invalid: PROCEDURE
     #snd_val = 1119 : snd_gate = 10 : snd_post = 5 : GOSUB play_tone
 END
+
+' sound_noise_set/off: white noise for the torpedo-launch animation
+' (torpedo_anim WAITs between colour steps, so unlike play_tone these
+' don't block -- the caller owns the duration, and re-calls _set with a
+' falling snd_nvol each step to decay the noise). SOUND 4's second argument
+' is the raw AY mixer register (active-low enables; IntyBASIC's default is
+' $38 = tones A-C on, noise off): $31 = %110001 flips channel A from tone
+' to noise, leaving B/C as tone. Channel A's frequency is set to 1, not 0,
+' per the manual ("don't use a zero value... in order to get a fast
+' response when changing frequency") -- inaudible anyway with tone A off.
+    DIM snd_nvol
+sound_noise_set: PROCEDURE
+    SOUND 4, 12, $31
+    SOUND 0, 1, snd_nvol
+END
+
+sound_noise_off: PROCEDURE
+    SOUND 0, 1, 0
+    SOUND 4, 1, $38
+END
