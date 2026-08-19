@@ -48,7 +48,8 @@ sound_join: PROCEDURE
     #snd_val = 224 : snd_gate = 5 : snd_post = 0 : GOSUB play_tone
 END
 
-' sound_myturn: it's your turn to fire (double beep, 430,430 Hz).
+' sound_myturn: your turn to fire has just begun -- played once on the
+' transition, before the targeting cursor goes up (double beep, 430,430 Hz).
 sound_myturn: PROCEDURE
     #snd_val = 260 : snd_gate = 4 : snd_post = 2 : GOSUB play_tone
     #snd_val = 260 : snd_gate = 4 : snd_post = 2 : GOSUB play_tone

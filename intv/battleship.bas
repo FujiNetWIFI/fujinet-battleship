@@ -80,6 +80,7 @@ lit_comma: DATA 44
     DIM cur_status, cur_pc, cur_pstatus, prev_status, ships_drawn, has_action
     DIM atk_pos, has_targeted
     DIM prev_seen_pc, prev_result_status, prev_result_pos, rb_lastattack
+    DIM prev_active, turn_changed
 
     DIM pc_x, pc_y, pc_dir, pc_size, pc_i, pc_ok, pc_moved
     DIM pc_prevx, pc_prevy, pc_prevdir, pc_cx, pc_cy, pc_mx, pc_my
@@ -496,6 +497,7 @@ table_joined:
 ' ===========================================================================
     prev_status = 255 ' sentinel: forces the initial CLS/board_init
     prev_seen_pc = 255 ' sentinel: skip the join/leave cue on the first poll
+    prev_active = 255 ' sentinel: forces the turn cue if we arrive mid-turn
     prev_result_status = 255
     prev_result_pos = 255
     poll_wait = 0
@@ -535,6 +537,15 @@ tl_loop:
     cur_status = state_status
     cur_pc = state_playercount
     cur_pstatus = state_playerstatus
+
+    ' Turn edge: activePlayer differs from the previous poll's. Same scheme
+    ' Fujitzee/Fujirkle use, and the same reason -- activePlayer stays 0 for
+    ' every poll of your turn, so it alone can't tell "your turn just began"
+    ' from "still your turn". prev_active advances at the bottom of every
+    ' successful poll (lobby and placement included), so the lobby->play
+    ' transition is caught by the same comparison as any other turn change.
+    turn_changed = 0
+    IF active_player <> prev_active THEN turn_changed = 1
 
     IF prev_seen_pc <> 255 THEN
         IF cur_pc > prev_seen_pc THEN GOSUB sound_player_join
@@ -633,9 +644,16 @@ tl_loop:
             END IF
 
             IF active_player = 0 AND cur_pstatus = PSTATUS_PLAYING THEN
+                ' Announce the turn *before* entering targeting: that's a
+                ' blocking loop that doesn't return until the shot is fired,
+                ' the player bails to the menu, or the clock runs out, so a
+                ' cue after it would arrive too late to be an alert at all
+                ' (and would be skipped entirely on the bail/timeout paths).
+                ' turn_changed also keeps a menu bail and re-entry from
+                ' replaying it for the same turn.
+                IF turn_changed THEN GOSUB sound_myturn
                 GOSUB targeting
                 IF has_targeted THEN
-                    GOSUB sound_myturn
                     has_action = 3
                     poll_wait = 0
                 ELSE
@@ -648,6 +666,7 @@ tl_loop:
     END IF
 
     prev_status = cur_status
+    prev_active = active_player
 
 tl_input:
     ' Lobby ready-toggle lives here (sampled every frame) rather than in
