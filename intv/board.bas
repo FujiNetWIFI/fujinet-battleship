@@ -65,6 +65,17 @@
     CONST BCOL_CURSOR  = 6   ' yellow
     CONST BCOL_DIVIDER = 0   ' black
 
+' player_color(i): identity colour for player/quadrant i (the server rotates
+' its player list so the requesting client is always index 0, and index =
+' quadrant, so these are stable per seat). One table serves both the
+' colored-squares markers and GROM text: squares only take STIC primaries
+' 0-6 (no white), and GROM cards in Color Stack mode only take FG colours
+' 0-7 (a pastel's $1000 bit turns the card INTO a colored square) -- for
+' 0-6 the two encodings are numerically identical. Black is the backdrop
+' and blue is water, so the usable pool is red/tan/darkgreen/green/yellow;
+' the local player gets green to match BCOL_SHIP.
+    player_color: DATA 5, 2, 6, 3   ' P0 green, P1 red, P2 yellow, P3 tan
+
 ' ---------------------------------------------------------------------------
 ' cs_fill: paint an entire card (all four sub-squares) with one colour.
 ' Inputs: cs_col, cs_row (card coords), cs_color.
@@ -168,4 +179,43 @@ board_cell: PROCEDURE
     cs_q = (bc_y AND 1) * 2 + (bc_x AND 1)
     cs_color = bc_color
     GOSUB cs_plot
+END
+
+' ---------------------------------------------------------------------------
+' draw_quadrant_markers: L-shaped bracket in each seated player's colour,
+' hugging their quadrant's inner corner at the divider's center cross. The
+' brackets live entirely in the divider -- every board cell is playable and
+' gets repainted by the diff renderer, so a marker there couldn't survive
+' (and would read as game state). Quadrants at or past qm_count are drawn
+' in black, erasing a stale bracket if a seat empties mid-game.
+'
+' Per quadrant: the corner sub-square of center card (5,5), plus two cards
+' of arm along each divider leg, using only the half of the divider's width
+' that faces the quadrant. qm_sub is the corner sub-square (0=TL 1=TR 2=BL
+' 3=BR, matching cs_plot's numbering); its bit 0 picks the left/right half
+' for the vertical arm and its bit 1 the top/bottom half for the horizontal
+' arm, so the arm sub-squares derive from it instead of needing tables of
+' their own.
+' ---------------------------------------------------------------------------
+    qm_sub:  DATA 2, 0, 1, 3    ' q0..q3 corner sub-square in card (5,5)
+    qm_vrow: DATA 6, 3, 3, 6    ' first card row of the vertical arm (col 5)
+    qm_hcol: DATA 3, 3, 6, 6    ' first card col of the horizontal arm (row 5)
+
+DIM qm_q, qm_i, qm_count, qm_color, qm_s
+draw_quadrant_markers: PROCEDURE
+    FOR qm_q = 0 TO 3
+        qm_color = 0
+        IF qm_q < qm_count THEN qm_color = player_color(qm_q)
+        qm_s = qm_sub(qm_q)
+        cs_color = qm_color
+        cs_col = 5 : cs_row = 5 : cs_q = qm_s : GOSUB cs_plot
+        FOR qm_i = 0 TO 1
+            cs_col = 5 : cs_row = qm_vrow(qm_q) + qm_i
+            cs_q = qm_s AND 1 : GOSUB cs_plot
+            cs_q = (qm_s AND 1) + 2 : GOSUB cs_plot
+            cs_col = qm_hcol(qm_q) + qm_i : cs_row = 5
+            cs_q = qm_s AND 2 : GOSUB cs_plot
+            cs_q = (qm_s AND 2) + 1 : GOSUB cs_plot
+        NEXT qm_i
+    NEXT qm_q
 END

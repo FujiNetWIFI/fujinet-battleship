@@ -97,10 +97,12 @@ lit_comma: DATA 44
 ' ---------------------------------------------------------------------------
 ' draw_field: render df_len ASCII bytes from #df_src onto the screen at
 ' BACKTAB offset df_pos, in color #df_color. MODE 0 gives full GROM (cards
-' 0-255), so unlike 5cardstud's MODE 1 client, lowercase is available --
-' server prompts/names arrive lowercased and are shown as-is. Stops at a
-' NUL and pads the rest of the field with spaces; clamps anything outside
-' the printable range to a space rather than drawing garbage.
+' 0-255), so unlike 5cardstud's MODE 1 client, lowercase is available in
+' GROM, but names and messages are shown in uppercase for consistency with
+' the rest of the UI -- server prompts/names that arrive lowercased are
+' upshifted here. Stops at a NUL and pads the rest of the field with
+' spaces; clamps anything outside the printable range to a space rather
+' than drawing garbage.
 ' ---------------------------------------------------------------------------
 draw_field: PROCEDURE
     df_stop = 0
@@ -109,6 +111,7 @@ draw_field: PROCEDURE
         IF df_c = 0 THEN df_stop = 1
         IF df_stop THEN df_c = 32
         IF df_c < 32 OR df_c > 127 THEN df_c = 32
+        IF df_c >= 97 AND df_c <= 122 THEN df_c = df_c - 32
         #BACKTAB(df_pos + df_i) = (df_c - 32) * 8 + #df_color
     NEXT df_i
 END
@@ -546,13 +549,23 @@ tl_loop:
             CLS
             GOSUB board_init
         END IF
-        IF prev_status <> STATUS_GAMEOVER THEN GOSUB render_gameover
+        IF prev_status <> STATUS_GAMEOVER THEN
+            ' Markers redrawn here too, not just on board_init: a reconnect
+            ' straight into gameover takes the CLS path above, and a normal
+            ' game-end keeps whatever the last poll drew -- either way one
+            ' redraw with the final player count is correct.
+            qm_count = cur_pc
+            GOSUB draw_quadrant_markers
+            GOSUB render_gameover
+        END IF
         poll_wait = 60
     ELSE
         ' STATUS_PLACE_SHIPS, GAMESTART, MISS, HIT, SUNK.
         IF prev_status = STATUS_LOBBY OR prev_status = 255 THEN
             CLS
             GOSUB board_init
+            qm_count = cur_pc
+            GOSUB draw_quadrant_markers
             ships_drawn = 0
         END IF
 
@@ -599,6 +612,11 @@ tl_loop:
             ' (render_game_board has no WAITs, so the reveal is immediate).
             IF ta_ran THEN GOSUB torpedo_tail
             GOSUB render_panel
+            ' Per-poll like the panel: keeps the brackets tracking the
+            ' player count if someone leaves mid-game (the server compacts
+            ' its list, shifting quadrants), erasing the vacated one.
+            qm_count = cur_pc
+            GOSUB draw_quadrant_markers
             #df_src = FN_RX + GAME_PROMPT : df_pos = STATUS_ROW : df_len = ROWCELLS : #df_color = COL_TEXT
             GOSUB draw_field
 
@@ -645,11 +663,14 @@ render_lobby: PROCEDURE
     GOSUB draw_field
     FOR gs_i = 0 TO cur_pc - 1
         #tmp_addr = lobby_player_addr(gs_i)
-        #df_src = #tmp_addr + LP_NAME : df_pos = 60 + gs_i * 20 : df_len = 9 : #df_color = COL_TEXT
+        ' Same identity colour the game screen will use: the server rotates
+        ' its player list so this client is index 0 in the lobby too, so
+        ' the colour seen here follows the player onto their quadrant.
+        #df_src = #tmp_addr + LP_NAME : df_pos = 60 + gs_i * 20 : df_len = 9 : #df_color = player_color(gs_i)
         GOSUB draw_field
         #gs_c = 46 ' '.'
         IF (PEEK(#tmp_addr + LP_READY) AND 255) <> 0 THEN #gs_c = 42 ' '*'
-        #BACKTAB(60 + gs_i * 20 + 10) = (#gs_c - 32) * 8 + COL_TEXT
+        #BACKTAB(60 + gs_i * 20 + 10) = (#gs_c - 32) * 8 + player_color(gs_i)
     NEXT gs_i
     #df_src = FN_RX + GAME_PROMPT : df_pos = STATUS_ROW : df_len = ROWCELLS : #df_color = COL_TEXT
     GOSUB draw_field
@@ -717,14 +738,18 @@ END
 ' ===========================================================================
 ' render_panel: right-hand chrome (columns 11-19). Three rows per player
 ' (name, ships-left, blank separator) x 4 players fits rows 0-10 exactly.
-' Redrawn in full every poll -- cheap (36 characters max) and simpler than
-' diffing four short text fields.
+' Name and ships-left are drawn in the player's identity colour
+' (board.bas's player_color, shared with the quadrant corner markers); the
+' active player is flagged with a white TURN tag after the ships-left row
+' instead, since a colour swap would erase the identity colour. Redrawn in
+' full every poll -- cheap (52 characters max) and simpler than diffing
+' four short text fields.
 ' ===========================================================================
+lit_turn: DATA 84,85,82,78
 render_panel: PROCEDURE
     FOR rb_i = 0 TO 3
-        #gs_c = COL_TEXT
         IF rb_i < cur_pc THEN
-            IF rb_i = active_player THEN #gs_c = COL_HILITE
+            #gs_c = player_color(rb_i)
             #df_src = player_addr(rb_i) + PL_NAME : df_pos = screenpos(PANEL_COL, rb_i * 3) : df_len = 9 : #df_color = #gs_c
             GOSUB draw_field
             FOR rb_j = 0 TO 4
@@ -732,6 +757,16 @@ render_panel: PROCEDURE
                 rb_ch = 46 ' '.'  -- sunk
                 IF rb_state <> 0 THEN rb_ch = 35 ' '#' -- afloat
                 #BACKTAB(screenpos(PANEL_COL + rb_j, rb_i * 3 + 1)) = (rb_ch - 32) * 8 + #gs_c
+            NEXT rb_j
+            ' TURN tag, columns 16-19. Always write all 4 cells so the tag
+            ' follows the turn without a stale copy lingering on the
+            ' previous player's row.
+            FOR rb_j = 0 TO 3
+                IF rb_i = active_player THEN
+                    #BACKTAB(screenpos(PANEL_COL + 5 + rb_j, rb_i * 3 + 1)) = (lit_turn(rb_j) - 32) * 8 + CS_WHITE
+                ELSE
+                    #BACKTAB(screenpos(PANEL_COL + 5 + rb_j, rb_i * 3 + 1)) = COL_TEXT
+                END IF
             NEXT rb_j
         ELSE
             FOR rb_j = 0 TO 8
