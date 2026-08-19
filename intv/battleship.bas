@@ -650,6 +650,21 @@ tl_loop:
     prev_status = cur_status
 
 tl_input:
+    ' Lobby ready-toggle lives here (sampled every frame) rather than in
+    ' render_lobby (sampled only once per 45-frame poll, where a quick tap
+    ' between polls would be missed): a fresh press queues has_action=1,
+    ' and the next loop pass sends /ready in place of /state. inp_btn_hit
+    ' is an edge, so a release is required between toggles -- one press
+    ' can't ready and un-ready across two polls, and the button that picked
+    ' the table can't toggle ready on arrival while it's still held.
+    IF cur_status = STATUS_LOBBY THEN
+        IF inp_btn_hit THEN
+            GOSUB sound_select
+            has_action = 1
+            poll_wait = 0
+        END IF
+    END IF
+
     IF inp_key_hit = 10 THEN GOSUB ingame_menu
     IF want_leave THEN
         want_leave = 0
@@ -658,7 +673,9 @@ tl_input:
     GOTO tl_loop
 
 ' ===========================================================================
-' render_lobby: server name, ready list, prompt. Trigger toggles /ready.
+' render_lobby: server name, ready list, prompt. Pure renderer -- the trigger
+' that toggles /ready is sampled per-frame up in tl_input, because this runs
+' only once per 45-frame poll.
 ' ===========================================================================
 render_lobby: PROCEDURE
     #df_src = FN_RX + LOBBY_SERVERNAME : df_pos = 20 : df_len = 20 : #df_color = COL_TEXT
@@ -676,14 +693,6 @@ render_lobby: PROCEDURE
     NEXT gs_i
     #df_src = FN_RX + GAME_PROMPT : df_pos = STATUS_ROW : df_len = ROWCELLS : #df_color = COL_TEXT
     GOSUB draw_field
-
-    IF inp_btn_hit THEN
-        GOSUB sound_select
-        url_path = 2 : GOSUB compose_url
-        #net_readlen = GAME_MAXLEN
-        GOSUB api_call
-        poll_wait = 15
-    END IF
 END
 
 ' ===========================================================================
