@@ -762,7 +762,9 @@ void resetInputField()
 /// @brief Handles available key strokes for the defined input box (player name and chat). Returns true if user hits enter
 bool inputFieldCycle(uint8_t x, uint8_t y, uint8_t max, char *buffer)
 {
-    uint8_t curx, lastY;
+    // These must persist between calls (curx tracks the cursor across the
+    // keystroke cycles); as stack locals they only worked by accident on cc65
+    static uint8_t curx, lastY;
 
     // Initialize first call to input box
     if (inputField_done == 1 || lastY != y)

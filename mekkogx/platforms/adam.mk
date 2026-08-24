@@ -8,7 +8,9 @@ include $(MWD)/toolchains/z88dk.mk
 ADAM_FLAGS = +coleco -subtype=adam
 CFLAGS += $(ADAM_FLAGS)
 LDFLAGS += $(ADAM_FLAGS)
-LIBS += -leos.lib -lsmartkeys.lib
+# smartkeys targets z88dk's linear bitmap mode-2 layout and must not be
+# combined with the tile/char-map screen this port uses - link eos only.
+LIBS += -leos.lib
 ifneq ($(IS_LIBRARY),1)
   LDFLAGS += -create-app
 endif

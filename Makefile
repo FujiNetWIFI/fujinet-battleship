@@ -34,7 +34,7 @@ endef
 
 PRODUCT = fbs
 PRODUCT_UPPER = FBS
-PLATFORMS = coco atari apple2 c64
+PLATFORMS = coco atari apple2 c64 adam
 
 # Use "make-exp msdos" to build msdos.
 # That version uses fujinet-lib-experimental.
@@ -56,6 +56,13 @@ CFLAGS += -DPLATFORM_VARS="\"../$(PLATFORM)/vars.h\""
 ifeq ($(PLATFORM),msdos)
   CFLAGS =
 endif
+
+## Adam (z88dk) - same vars.h hack; build against the local fujinet-lib tree
+ifeq ($(PLATFORM),adam)
+  CFLAGS =
+  FUJINET_LIB = ../fujinet-lib/build
+endif
+LDFLAGS_EXTRA_ADAM = -m
 
 ## Coco specific flags (cmoc)
 CFLAGS_EXTRA_COCO = \
@@ -180,6 +187,11 @@ apple2/disk-post::
 	cp support/apple2/bootable.po $(DISK)
 	ac -p "$(DISK)" $(PRODUCT_UPPER).SYSTEM SYS < $(CC65_UTILS_DIR)/$(LOADER_SYSTEM)
 	ac -as "$(DISK)" $(PRODUCT_UPPER) bin <$(EXECUTABLE)
+
+adam/r2r-post::
+#	Stage the DDP on the local TNFS root for loading via the TMA-3 host slot.
+#	Skipped silently inside the defoogi container, where ~/tnfs is not mounted.
+	-@[ -d ~/tnfs ] && cp $(EXECUTABLE) ~/tnfs/ && echo "Copied $(EXECUTABLE) to ~/tnfs/" || true
 	
 
 # Reset FujiNet-PC

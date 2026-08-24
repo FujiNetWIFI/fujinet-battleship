@@ -26,6 +26,22 @@ unsigned char kbhit (void);
  */
 char cgetc (void);
 
+#elif defined(__ADAM__)
+// z88dk's conio.h maps cgetc() onto getk(), which is a dead stub on the
+// Adam target - kbhit/cgetc are implemented over EOS in src/adam/input.c
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+/* (Non blocking) Return non-zero if a key is waiting. */
+unsigned char kbhit (void);
+
+/* (Blocking) Return a character from the keyboard.
+ * Must be unsigned: sccz80 chars are signed, and the Adam's arrow/smart
+ * keys are 0x81-0xA8 - a plain char return would sign-extend them and no
+ * KEY_* case in the input switch would ever match. */
+unsigned char cgetc (void);
+
 #else
 // Standard libraries
 #include <conio.h>
