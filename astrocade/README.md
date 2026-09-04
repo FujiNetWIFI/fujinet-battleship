@@ -157,3 +157,11 @@ cues, and RESET continuity. Not yet done: appkey persistence for the
 username and the lobby room handoff (core-only scope for v1), the
 torpedo launch animation, and nothing has run on real hardware, because
 the cartridge itself has not been built.
+
+## Bank switching
+
+Firmware protocol v2 supports banked carts: `fujilib.inc` now carries the
+`FNBKSEL`/`FNBKMAX` equates (one read maps a 4K image page into
+2000H-2FFFH with the mailbox fully live; the high half never moves). This
+client still fits the single 8K window and does not use them -- see
+`firmware/include/fuji_mailbox.h` in fujinet-firmware for the scheme.
