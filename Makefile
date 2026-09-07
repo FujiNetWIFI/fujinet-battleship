@@ -64,6 +64,32 @@ ifeq ($(PLATFORM),adam)
 endif
 LDFLAGS_EXTRA_ADAM = -m
 
+## ColecoVision (z88dk +coleco, FujiNet mailbox cartridge). Not in PLATFORMS:
+## it needs fujinet-lib-experimental (the only lib with the coleco bus), so
+## build with either
+##   ./make-exp coleco                                      (clones + builds the lib)
+##   make coleco FUJINET_LIB=$(HOME)/Workspace/fujinet-lib-experimental
+## z88dk puts -D__COLECO__ in the target-wide OPTIONS line, so the Adam
+## subtype defines it too -- __COLECO__ alone does not mean ColecoVision.
+## src/coleco is therefore guarded by BUILD_COLECO.
+ifeq ($(PLATFORM),coleco)
+  CFLAGS =
+endif
+CFLAGS_EXTRA_COLECO = -DBUILD_COLECO -DCUSTOM_FUJINET_CALLS -O3
+# The console has 1K of RAM and the BIOS owns both ends of it: $7000-$702B is
+# the cartridge header's own tables, $73B9-$73FF is BIOS scratch, and what is
+# left -- 908 bytes -- holds BSS, DATA and the C stack. -m leaves a map next to
+# the image so that total can actually be read off. No generic console: the
+# game drives the VDP itself (src/coleco/graphics.c), so the crt0 is told to
+# leave the screen mode alone.
+LDFLAGS_EXTRA_COLECO += -m \
+  -pragma-define:CRT_ORG_BSS=0x702C \
+  -pragma-define:REGISTER_SP=0x73B8 \
+  -pragma-define:CRT_ENABLE_STDIO=0 \
+  -pragma-define:CLIB_FOPEN_MAX=0 \
+  -pragma-define:CLIB_EXIT_STACK_SIZE=0 \
+  -pragma-define:CLIB_DEFAULT_SCREEN_MODE=-1
+
 ## Coco specific flags (cmoc)
 CFLAGS_EXTRA_COCO = \
 	-Wno-assign-in-condition \
@@ -118,6 +144,11 @@ $(PLATFORM)/r2r::
 #	from /support/[platform] without needing to clean.
 	rm -f build/$(PLATFORM)/charset.o
 	rm -f build/$(PLATFORM)/hires.o
+
+#   COLECO ONLY - regenerate the charset from the msdos art
+ifeq ($(PLATFORM),coleco)
+	python3 support/coleco/make_charset.py
+endif
 
 #   COCO ONLY - copy proper file for Coco1/2 vs Coco3	
 ifeq ($(MAKE_COCO3),COCO3)
@@ -193,6 +224,38 @@ adam/r2r-post::
 #	Skipped silently inside the defoogi container, where ~/tnfs is not mounted.
 	-@[ -d ~/tnfs ] && cp $(EXECUTABLE) ~/tnfs/ && echo "Copied $(EXECUTABLE) to ~/tnfs/" || true
 	
+
+# ColecoVision: headless smoke test in MAME's coleco driver, against a live
+# fujinet-pc (the cartridge device dials its BoIP listener on 127.0.0.1:9995).
+# MAME resolves rompath, pluginspath and its Lua search path against its OWN
+# working directory, so it is run from the MAME tree and everything handed to
+# it is absolute -- run it from anywhere else and -autoboot_script is ignored
+# silently. That tree needs fujinet-firmware/pico/coleco/emu/apply.sh run
+# against it once for -cartslot fujinet to exist.
+#
+#   make coleco-smoke                          print the screen
+#   make coleco-smoke EXPECT="FUJI BATTLESHIP" and assert on it
+#   make coleco-smoke SCRIPT="fire,fire"       drive the controller first
+#   make coleco-smoke AT=20                    settle longer before sampling
+MAME_DIR    ?= $(HOME)/Workspace/mame
+COLECO_ROM  := $(CURDIR)/r2r/coleco/$(PRODUCT).rom
+AT          ?= 8
+EXPECT      ?=
+SCRIPT      ?=
+# Each scripted press costs a hold plus a gap; 3s of settle before the first.
+SETTLE      ?= 8
+comma       := ,
+SECS        ?= $(shell echo $$(( $(AT) + $(SETTLE) + 4 + 2 * $(words $(subst $(comma), ,$(SCRIPT))) )))
+
+.PHONY: coleco-smoke
+
+coleco-smoke:
+	cd $(MAME_DIR) && \
+	FBS_FONT=$(CURDIR)/src/coleco/font.bin FBS_AT=$(AT) FBS_EXPECT="$(EXPECT)" \
+	FBS_SCRIPT="$(SCRIPT)" FBS_SETTLE=$(SETTLE) FBS_SNAP="$(SNAP)" \
+	./mame coleco -cartslot fujinet -cart $(COLECO_ROM) \
+	    -video none -sound none -nothrottle -seconds_to_run $(SECS) \
+	    -autoboot_script $(CURDIR)/support/coleco/smoke.lua
 
 # Reset FujiNet-PC
 reset-fn:

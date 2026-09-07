@@ -24,18 +24,24 @@ char serverEndpoint[50] = "https://battleship.carr-designs.com/";
 
 // For local dev testing, instead of changing the endpoint above,
 // set 1st byte in the e41c0500 appkey to 0xff, which will cause the below endpoint to be used
-char localServer[] = "http://127.0.0.1:8080/";
+const char localServer[] = "http://127.0.0.1:8080/";
 
-char query[50] = ""; //"?table=dev7";//&player=ERICAPL2";
-char playerName[12] = "";
+// Zero-initialized by the C runtime (BSS) - an explicit = "" would cost the
+// z88dk ROM a stored DATA image of the zeros
+char query[QUERY_LEN]; //"?table=dev7";//&player=ERICAPL2";
+char playerName[12];
 
+// On the ColecoVision this is a macro for the FujiNet cartridge's reply
+// window, not an object -- see src/misc.h.
+#ifndef BUILD_COLECO
 ClientState clientState;
+#endif
 GameState state;
 PrefsStruct prefs;
 
 // Common local scope temp variables
-char tempBuffer[128];
-uint8_t shipSize[5] = {5, 4, 3, 3, 2}; // Standard ship sizes
+char tempBuffer[TEMP_BUFFER_LEN];
+const uint8_t shipSize[5] = {5, 4, 3, 3, 2}; // Standard ship sizes
 
 // extern void toneFinder();
 
@@ -47,7 +53,7 @@ void main(void)
     // toneFinder();
     // printf("Press keys\n");while(1) {while (!kbhit());failedApiCalls = cgetc();printf("%d 0x%x\n", failedApiCalls, failedApiCalls);} // Read Key
     
-    loadPrefs();    
+    loadPrefs();
     initGraphics();
     initSound();
 

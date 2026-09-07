@@ -42,6 +42,20 @@ unsigned char kbhit (void);
  * KEY_* case in the input switch would ever match. */
 unsigned char cgetc (void);
 
+#elif defined(BUILD_COLECO)
+// No keyboard at all: src/coleco/input.c synthesizes key codes from the
+// twelve-key keypad and the second fire button. unsigned for the same
+// sign-extension reason as the Adam above.
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+/* (Non blocking) Return non-zero if a synthesized key is waiting. */
+unsigned char kbhit (void);
+
+/* (Blocking) Return a synthesized key code. */
+unsigned char cgetc (void);
+
 #else
 // Standard libraries
 #include <conio.h>

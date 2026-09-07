@@ -15,6 +15,26 @@
 #define REMOVE_PLAYER_KEY '/'
 #define INGAME_MENU_X WIDTH / 2 - 8
 
+// Key labels shown to the player. Platforms whose input maps these shortcuts
+// onto other physical keys (e.g. the ColecoVision keypad) override them in
+// their vars.h so the labels match what the player actually presses.
+#ifndef TABLE_STATUS_TEXT
+#define TABLE_STATUS_TEXT "Refresh    Help     Name    Quit"
+#endif
+#ifndef MENU_QUIT_TEXT
+#define MENU_QUIT_TEXT "  Q: quit game"
+#endif
+#ifndef MENU_HELP_TEXT
+#define MENU_HELP_TEXT "  H: how to play"
+#endif
+// The ON variant carries a trailing space so toggling from OFF erases the F
+#ifndef MENU_SOUND_ON_TEXT
+#define MENU_SOUND_ON_TEXT "  S: sound ON "
+#endif
+#ifndef MENU_SOUND_OFF_TEXT
+#define MENU_SOUND_OFF_TEXT "  S: sound OFF"
+#endif
+
 // Logo vertical position - set in [platform]/vars.h to override if needed
 #ifndef LOGO_Y
 #define LOGO_Y 1
@@ -131,8 +151,12 @@ void showPlayerNameScreen()
     i = (uint8_t)strlen(playerName);
 
     clearCommonInput();
+#ifdef USE_PLATFORM_NAME_ENTRY
+    platformNameEntry(WIDTH / 2 - PLAYER_NAME_MAX / 2, 17, PLAYER_NAME_MAX, playerName);
+#else
     while (!inputFieldCycle(WIDTH / 2 - PLAYER_NAME_MAX / 2, 17, PLAYER_NAME_MAX, playerName))
         ;
+#endif
 
     for (y = 13; y < 19; ++y)
         centerText(y, "                 ");
@@ -191,7 +215,10 @@ void showWelcomeScreen()
 /// @brief Shows a screen to select a table to join
 void showTableSelectionScreen()
 {
-    uint8_t shownCursor, tableIndex, blinkCursor, redrawScreen, i, j;
+    // tableCount is the local truth for the table list: clientState is not
+    // writable on every platform (the ColecoVision reads it out of cartridge
+    // ROM), so the "no tables yet" state lives here, not in clientState.
+    uint8_t shownCursor, tableIndex, blinkCursor, i, j, tableCount = 0;
     Table *table;
     state.inGame = tableIndex = blinkCursor = 0;
 
@@ -206,9 +233,9 @@ void showTableSelectionScreen()
         strcat(tempBuffer, playerName);
         centerTextAlt(20, tempBuffer);
 
-        if (clientState.tables.count > 0)
+        if (tableCount > 0)
         {
-            for (i = 0; i < clientState.tables.count; ++i)
+            for (i = 0; i < tableCount; ++i)
             {
                 drawSpace(LMAR, 9 + i * 2, TWID);
             }
@@ -225,13 +252,14 @@ void showTableSelectionScreen()
 
         // waitvsync();
 
-        clientState.tables.count = 0;
-        apiCall("tables");
+        tableCount = apiCall("tables") == API_CALL_SUCCESS ? clientState.tables.count : 0;
+        if (tableIndex >= tableCount)
+            tableIndex = 0;
 
-        if (clientState.tables.count > 0)
+        if (tableCount > 0)
         {
             drawSpace(LMAR, 12, TWID);
-            for (i = 0; i < clientState.tables.count; ++i)
+            for (i = 0; i < tableCount; ++i)
             {
                 table = &clientState.tables.table[i];
                 j = 9 + i * 2;
@@ -250,7 +278,7 @@ void showTableSelectionScreen()
             centerText(12, "no servers are available");
         }
 
-        centerStatusText("Refresh    Help     Name    Quit");
+        centerStatusText(TABLE_STATUS_TEXT);
 
 #ifdef COLOR_TOGGLE
         if (prefs.color)
@@ -262,13 +290,13 @@ void showTableSelectionScreen()
         }
 #endif
 
-        shownCursor = !clientState.tables.count;
+        shownCursor = !tableCount;
 
         clearCommonInput();
-        while (!input.trigger || !clientState.tables.count)
+        while (!input.trigger || !tableCount)
         {
 
-            if (clientState.tables.count)
+            if (tableCount)
             {
                 drawIcon(LMAR - 2, 9 + tableIndex * 2, blinkCursor < 50 ? ICON_MARK : ICON_MARK_ALT);
             }
@@ -305,6 +333,10 @@ void showTableSelectionScreen()
                 prefs.disableSound = !prefs.disableSound;
                 soundCursor();
                 savePrefs();
+                // savePrefs() ran a FujiNet transaction; on platforms where
+                // the table list lives in the cartridge's reply window it is
+                // stale now, so refresh rather than keep navigating it
+                break;
             }
             else if (input.key == 'n' || input.key == 'N')
             {
@@ -315,12 +347,15 @@ void showTableSelectionScreen()
             else if (input.key == 'q' || input.key == 'Q')
             {
                 quit();
+                // quit() only returns on failure, after FujiNet transactions
+                // of its own - same stale-window refresh as above
+                break;
             } /*else if (input.key != 0) {
                 itoa(input.key, tempBuffer, 10);
                 drawStatusText(tempBuffer);
             }*/
 
-            if (!shownCursor || (clientState.tables.count > 0 && input.dirY))
+            if (!shownCursor || (tableCount > 0 && input.dirY))
             {
 
                 // Visually unselect old table
@@ -333,7 +368,7 @@ void showTableSelectionScreen()
                 drawTextAlt(RMAR - 5, j, table->players);
 
                 // Move table index to new table
-                tableIndex = (input.dirY + tableIndex + clientState.tables.count) % clientState.tables.count;
+                tableIndex = (input.dirY + tableIndex + tableCount) % tableCount;
 
                 // Visually select new table
 
@@ -416,12 +451,12 @@ void showInGameMenuScreen()
 
         resetScreen();
         y = HEIGHT / 2 - 3;
-        drawTextAlt(INGAME_MENU_X, y, "  Q: quit game");
-        drawTextAlt(INGAME_MENU_X, y += 2, "  H: how to play");
+        drawTextAlt(INGAME_MENU_X, y, MENU_QUIT_TEXT);
+        drawTextAlt(INGAME_MENU_X, y += 2, MENU_HELP_TEXT);
         if (prefs.colorMode)
             drawTextAlt(INGAME_MENU_X, y += 2, "  C: color mode");
 
-        drawTextAlt(INGAME_MENU_X, y += 2, prefs.disableSound ? "  S: sound OFF" : "  S: sound ON");
+        drawTextAlt(INGAME_MENU_X, y += 2, prefs.disableSound ? MENU_SOUND_OFF_TEXT : MENU_SOUND_ON_TEXT);
 
         drawBox(INGAME_MENU_X - 2, HEIGHT / 2 - 5, 19, y - (HEIGHT / 2 - 5) + 1);
 
@@ -444,7 +479,7 @@ void showInGameMenuScreen()
             case 's':
             case 'S':
                 prefs.disableSound = !prefs.disableSound;
-                drawTextAlt(INGAME_MENU_X, y, prefs.disableSound ? "  S: sound OFF" : "  S: sound ON ");
+                drawTextAlt(INGAME_MENU_X, y, prefs.disableSound ? MENU_SOUND_OFF_TEXT : MENU_SOUND_ON_TEXT);
                 soundSelect();
                 savePrefs();
                 break;
@@ -489,7 +524,11 @@ void showInGameMenuScreen()
     state.inGame = true;
     if ((!state.drawBoard && !restoreScreen()) || state.drawBoard)
     {
+        // Re-fetch before redrawing rather than rendering clientState here:
+        // the menu's savePrefs()/appkey writes ran FujiNet transactions, and
+        // on platforms where the state lives in the cartridge's reply window
+        // it is stale now. The main loop redraws on the next poll.
         clearRenderState();
-        processStateChange();
+        state.apiCallWait = 0;
     }
 }

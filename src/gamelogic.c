@@ -14,6 +14,12 @@
 #define TIMER_WIDTH 1
 #endif
 
+// Platforms whose input maps the rotate shortcut onto another physical key
+// (e.g. the ColecoVision keypad) override this in their vars.h
+#ifndef ROTATE_PROMPT_TEXT
+#define ROTATE_PROMPT_TEXT "press R to rotate"
+#endif
+
 uint8_t posX = 0, posY = 0, inputField_done, validX;
 uint8_t shipPlacements[5] = {0, 0, 0, 0, 0};
 uint8_t shipPlaceIndex = 0;
@@ -28,6 +34,23 @@ void progressAnim(uint8_t y)
         pause(10);
         drawIcon(WIDTH / 2 - 2 + i * 2, y, ICON_MARK);
     }
+}
+
+// Capture a player's server gamefield into the local shadow (see the
+// GAMEFIELD_BYTES note in misc.h for why this is packed on the ColecoVision)
+static void packGamefield(uint8_t p)
+{
+#ifdef BUILD_COLECO
+    uint8_t *src = clientState.game.players[p].gamefield;
+    uint8_t i;
+
+    memset(&state.gamefield[p], 0, GAMEFIELD_BYTES);
+    for (i = 0; i < 100; i++)
+        if (src[i])
+            state.gamefield[p][i >> 3] |= 1 << (i & 7);
+#else
+    memcpy(&state.gamefield[p], &clientState.game.players[p].gamefield, 100);
+#endif
 }
 
 void processStateChange()
@@ -54,9 +77,9 @@ void processStateChange()
     {
         for(i=0;i<clientState.game.playerCount;i++)
         {
-            memcpy(&state.gamefield[i], &clientState.game.players[i].gamefield, 100);
+            packGamefield(i);
         }
-    } 
+    }
 }
 
 #define READY_LEFT WIDTH / 2 - 8
@@ -300,7 +323,7 @@ void renderGameboard()
         if (clientState.game.status == STATUS_PLACE_SHIPS)
         {
             centerText(5, "place your five ships");
-            centerTextAlt(7, "press R to rotate");
+            centerTextAlt(7, ROTATE_PROMPT_TEXT);
         }
         if (clientState.game.status >= STATUS_GAMESTART)
         {
@@ -341,7 +364,7 @@ void renderGameboard()
                 {
                     for (i = 0; i < clientState.game.playerCount; i++)
                     {
-                        if (i != state.prevActivePlayer && clientState.game.players[i].playerStatus == PLAYER_STATUS_DEFAULT && state.gamefield[i][clientState.game.lastAttackPos] == 0 )
+                        if (i != state.prevActivePlayer && clientState.game.players[i].playerStatus == PLAYER_STATUS_DEFAULT && GAMEFIELD_IS_EMPTY(i, clientState.game.lastAttackPos))
                             drawGamefieldUpdate(i, clientState.game.players[i].gamefield, clientState.game.lastAttackPos, j);
                     }
                     pause(5);
@@ -353,7 +376,7 @@ void renderGameboard()
             {
                 for (i = 0; i < clientState.game.playerCount; i++)
                 {
-                    if (i != state.prevActivePlayer && state.gamefield[i][clientState.game.lastAttackPos] == 0)
+                    if (i != state.prevActivePlayer && GAMEFIELD_IS_EMPTY(i, clientState.game.lastAttackPos))
                         drawGamefieldUpdate(i, clientState.game.players[i].gamefield, clientState.game.lastAttackPos, j & 1);
                 }
                 if (!playedSound)
@@ -534,19 +557,25 @@ void processInput()
     }
     else if (clientState.game.playerStatus != PLAYER_STATUS_VIEWING)
     {
-        // Toggle readiness if waiting to start game
+        // Toggle readiness if waiting to start game. The server echoes the
+        // updated lobby state back from "ready", so render from that truth
+        // rather than writing the toggle into clientState first - clientState
+        // is not writable on every platform (the ColecoVision reads it out of
+        // the cartridge's reply window).
         if (clientState.game.status == STATUS_LOBBY && input.trigger)
         {
-            clientState.lobby.playerStatus = clientState.lobby.playerStatus ? PLAYER_STATUS_DEFAULT : PLAYER_STATUS_READY;
-            clientState.lobby.players[0].ready = clientState.lobby.playerStatus;
-            renderLobby();
+            if (apiCall("ready") == API_CALL_SUCCESS && clientState.game.status == STATUS_LOBBY)
+            {
+                if (clientState.lobby.players[0].ready)
+                    soundSelect();
+                else
+                    soundInvalid();
 
-            if (clientState.lobby.playerStatus)
-                soundSelect();
-            else
-                soundInvalid();
+                renderLobby();
+            }
 
-            apiCall("ready");
+            // Poll again right away in case the reply was not the lobby state
+            state.apiCallWait = 0;
             clearCommonInput();
             return;
         }
@@ -571,18 +600,25 @@ void waitOnPlayerMove()
 {
     bool foundValidLocation;
     uint8_t waitCount, frames, lastFrame, i, j, moved, attackPos;
+    // The countdown tracker. Hoisted out of clientState: writing the ticking
+    // value back into it never worked on platforms where the state is
+    // read-only (the ColecoVision's cartridge reply window) - the write went
+    // nowhere, the loop condition never expired, and the move was never
+    // auto-resolved.
+    uint8_t timeLeft;
     uint16_t jifsPerSecond, maxJifs;
 
     resetTimer();
 
     // Determine max jiffies for PAL and NTS
     jifsPerSecond = getJiffiesPerSecond();
-    maxJifs = jifsPerSecond * clientState.game.moveTime;
+    timeLeft = clientState.game.moveTime;
+    maxJifs = jifsPerSecond * timeLeft;
     waitCount = 0;
     moved = frames = 9;
 
     // Move selection loop
-    while (clientState.game.moveTime > 0)
+    while (timeLeft > 0)
     {
         frames = (frames + 1) % 30;
         i = frames / 10;
@@ -626,7 +662,7 @@ void waitOnPlayerMove()
             // Check if at least one enemy cell is valid to attack
             for (i = 1; i < clientState.game.playerCount; i++)
             {
-                if (clientState.game.players[i].playerStatus == PLAYER_STATUS_DEFAULT && state.gamefield[i][attackPos] == 0 )
+                if (clientState.game.players[i].playerStatus == PLAYER_STATUS_DEFAULT && GAMEFIELD_IS_EMPTY(i, attackPos))
                     break;
             }
 
@@ -646,7 +682,7 @@ void waitOnPlayerMove()
                     for (i = 1; i < clientState.game.playerCount; i++)
                     {
                         if (clientState.game.players[i].playerStatus == PLAYER_STATUS_DEFAULT)
-                            drawGamefieldUpdate(i, clientState.game.players[i].gamefield, attackPos, state.gamefield[i][attackPos] == 0 ?  j : 0);
+                            drawGamefieldUpdate(i, clientState.game.players[i].gamefield, attackPos, GAMEFIELD_IS_EMPTY(i, attackPos) ?  j : 0);
                     }
                     pause(5);
                 }
@@ -680,9 +716,9 @@ void waitOnPlayerMove()
         {
             waitCount = 0;
             i = (uint8_t)((maxJifs - getTime()) / jifsPerSecond);
-            if (i <= 20 && i != clientState.game.moveTime)
+            if (i <= 20 && i != timeLeft)
             {
-                clientState.game.moveTime = i;
+                timeLeft = i;
                 if (i < 10)
                     tempBuffer[0] = ' ';
 
