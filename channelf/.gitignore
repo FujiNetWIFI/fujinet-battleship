@@ -1,0 +1,8 @@
+build/
+src/font.inc
+src/art.inc
+src/endpoint.inc
+src/flags.inc
+tools/__pycache__/
+src/*.lst
+src/*.p
