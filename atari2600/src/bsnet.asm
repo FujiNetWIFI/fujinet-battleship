@@ -28,11 +28,13 @@
         INCLUDE "bsdefs.inc"
 
 BSBANK  EQU     BANKNET
-BSHASUI EQU     0               ; it draws nothing and reads no input
+BSHASINP EQU    0               ; it draws nothing and reads no input
+BSHASUI EQU     0               ; ...and touches no player record
 BSHASED EQU     0
 BSHASNET EQU    1               ; it is the only bank that issues requests
 BSHASCLS EQU    0
 BSHASSTR EQU    0
+BSHASRPL EQU    0
 BSHASDEC EQU    0
 
         INCLUDE "../build/tail.inc"

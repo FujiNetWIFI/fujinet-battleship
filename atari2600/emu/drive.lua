@@ -65,6 +65,7 @@ end
 local ZP = { ENT = 0xA3, CLASS = 0xB6, STAT = 0xA5, ACT = 0xA7, PCNT = 0xA4,
              CNT = 0xAB, SEL = 0xAA, CURX = 0xAC, CURY = 0xAD, CLK = 0xB1,
              MYST = 0xA6, POLL = 0xA1, MODE = 0xB4, LIVE = 0xB3, SHIP = 0xAB,
+             SHIPS = 0xB7,
              REQ = 0x8F, ERR = 0x9A, STEP = 0x9B, ERR2 = 0xBE }
 local BANK, RPLY, PLANES = 0x1F0E, 0x1B00, 0x1800
 local BANKLOB, BANKGAM, BANKNET, BANKMNU, BANKNAM, BANKPLC, BANKCMP = 0, 1, 2, 3, 4, 5, 6
@@ -74,7 +75,7 @@ local n, phase, mark = 0, "boot", 0
 local hold, held, gap = 0, nil, 0
 local seq, seqi = nil, 1
 local did, fails, checks = {}, 0, 0
-local shots, results, readied = 0, 0, false
+local shots, results, readied = 0, 0, nil   -- readied: the frame it happened
 local lastbank, lastreq = 0, nil
 local snaps = 0
 local lastclass, lastact, laststat = -1, -1, -1
@@ -96,6 +97,39 @@ local function read_row(row)
         s = s .. (font.glyph[key] or "?")
     end
     return s
+end
+
+-- The fleet strips, text rows 3 and 4: six columns a seat, a space and five
+-- pips, in slot order. What they must say is shipsLeft[5] of that seat's
+-- record in the reply window -- '#' afloat, '=' sunk -- so read the strips
+-- back through the font and compare, which is the only check that sees the
+-- content rather than the geometry.
+local PLOFSL = { [0] = 1, 2, 0, 3 }             -- slot -> player, quadrants
+local fleetchecks = 0
+local function check_fleets()
+    local pc, stat = rd(ZP.PCNT), rd(ZP.STAT)
+    if stat < 10 then return end                -- no gamefields yet
+    fleetchecks = fleetchecks + 1
+    for pair = 0, 1 do
+        local got = read_row(pair == 0 and 3 or 4)
+        local want = ""
+        for half = 0, 1 do
+            local p = PLOFSL[pair * 2 + half]
+            if p >= pc then
+                want = want .. "      "
+            else
+                want = want .. " "
+                for j = 0, 4 do
+                    want = want .. (rd(RPLY + 49 + p * 115 + 110 + j) ~= 0 and "#" or "=")
+                end
+            end
+        end
+        if got ~= want then
+            fails = fails + 1
+            print(string.format("FAIL: fleet row %d reads %q, want %q",
+                                pair == 0 and 3 or 4, got, want))
+        end
+    end
 end
 
 local function snap(why)
@@ -200,6 +234,7 @@ local function done(ok)
     print(string.format("DID: %s", table.concat(did, "; ")))
     print(string.format("shots %d, results %d, table checks %d, mismatching %d",
                         shots, results, checks, fails))
+    print(string.format("fleet strip checks %d", fleetchecks))
     print(ok and "PASS" or "FAIL")
     phase, mark = "exit", n
 end
@@ -308,17 +343,43 @@ _G._drive = emu.add_machine_frame_notifier(function()
             return
         end
         if bank == BANKPLC then
-            -- five ships across, one row each, top to bottom
+            -- The fleet arrives rolled and legal, so the driver accepts it:
+            -- five presses and nothing else. Walking the cursor would be
+            -- wrong now as well as slower -- a blind step lands on another
+            -- hull and the client refuses it, with a tone, and waits.
             if not placing then
+                -- The roll is one candidate a frame and reads no input until
+                -- the last ship is down, so WAIT for it: SHIPS[4] is $FF
+                -- until then, and a press before that is simply not seen.
+                if rd(ZP.SHIPS + 4) == 0xFF then return end
                 placing = true
-                seq, seqi = { "P1 Button 1", "P1 Down", "P1 Button 1", "P1 Down",
-                              "P1 Button 1", "P1 Down", "P1 Button 1", "P1 Down",
-                              "P1 Button 1" }, 1
-                did[#did + 1] = "placed five ships"
+                seq, seqi = { "P1 Button 1", "P1 Button 1", "P1 Button 1",
+                              "P1 Button 1", "P1 Button 1" }, 1
+                did[#did + 1] = "accepted the rolled fleet"
                 snap("placing")
+                local ships, cells = {}, {}
+                for i = 0, 4 do
+                    local v = rd(ZP.SHIPS + i)
+                    ships[#ships + 1] = v
+                    local pos, dir = v % 100, v // 100
+                    for k = 0, ({5, 4, 3, 3, 2})[i + 1] - 1 do
+                        local c = pos + k * (dir == 1 and 10 or 1)
+                        if cells[c] then
+                            print("FAIL: rolled fleet overlaps at cell " .. c)
+                            fails = fails + 1
+                        end
+                        cells[c] = true
+                    end
+                end
+                print("  rolled: " .. table.concat(ships, " "))
             end
             if seqi <= #seq then press(seq[seqi]); seqi = seqi + 1 end
             return
+        end
+        -- The fleet strips are composed a frame behind the status row, so
+        -- check them on a settled frame rather than on the state edge.
+        if bank == BANKGAM and class == 2 and rd(ZP.MODE) == 1 and n % 64 == 0 then
+            check_fleets()
         end
         if bank ~= BANKGAM then return end
         if MODE == "resetleave" then
@@ -335,9 +396,18 @@ _G._drive = emu.add_machine_frame_notifier(function()
             return
         end
         if class == 0 and rd(ZP.STAT) == 0 then
-            if not readied and rd(ZP.MYST) ~= 3 then
-                press("P1 Button 1"); readied = true
-                did[#did + 1] = "readied up"
+            -- /ready TOGGLES, and the server resets a finished table back to
+            -- the lobby under us, so one press is not a guarantee of being
+            -- ready. Press again if the status has not become PSREADY after
+            -- a couple of polls -- a single shot left the run sitting in the
+            -- lobby until it timed out, which reads exactly like a hang.
+            if rd(ZP.MYST) ~= 3 then
+                if not readied or n - readied > 300 then
+                    press("P1 Button 1"); readied = n
+                    did[#did + 1] = "readied up"
+                end
+            else
+                readied = readied or n
             end
         elseif class == 2 then
             if act == 0 and rd(ZP.MYST) == 0 and rd(ZP.POLL) > 4 and rd(ZP.CLK) > 2 then

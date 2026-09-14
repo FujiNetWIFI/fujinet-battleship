@@ -16,13 +16,16 @@
         INCLUDE "bsdefs.inc"
 
 BSBANK  EQU     BANKCMP
+BSHASINP EQU    0               ; it draws nothing and reads no input
 BSHASUI EQU     1
 BSHASED EQU     0
 BSHASNET EQU    0
 BSHASCLS EQU    0
 BSHASSTR EQU    1
+BSHASRPL EQU    1
 BSHASDEC EQU    0
 SNDFULL EQU     0               ; it fires cues; the game bank ticks them
+SNDLAST EQU     11              ; every result cue
 
         INCLUDE "../build/tail.inc"
 
@@ -34,14 +37,22 @@ BSPPCNT EQU     BSBLINK
         ORG     $1000
 
 ; A poll's recompose is about 3,900 cycles, and the overscan a bank has
-; between two frames is about 2,200. So it is TWO PASSES: the boards -- the
-; cue edges and the blits -- between frames, in the overscan the network
-; bank's last frame armed; then the text, a frame later, inside the vblank
-; the game bank's hook hands over from (ENTEXT). The status row is one frame
-; behind the boards, which nobody can see.
+; between two frames is about 2,200. So it is PASSES: the cue edges and the
+; gamefields between frames, in the overscan the network bank's last frame
+; armed; then the AUX plane -- the hulls and the cursor -- and then the text,
+; a frame each, inside the vblank the game bank's hook hands over from
+; (ENTEXT). The status row is two frames behind the boards, which nobody can
+; see.
+;
+; The AUX plane used to ride the overscan with the gamefields, and at FOUR
+; seats the two did not fit: two more records to walk and two more blits, and
+; the poll's frame measured 265 lines instead of 262. It had always done
+; that; `make frames` was AI1, which is two seats, and nothing ran the
+; quadrant layout past a VSYNC tap until `make frames4`.
 ;
 ;   ENGAME    between frames, from a poll:      boards, then ENGNEXT
-;   ENTEXT    mid-frame, from the game's hook:  text, then ENGRUN
+;   ENTEXT    mid-frame, from the game's hook:  the AUX plane, then the
+;             text, a frame each, then ENGRUN
 ;   ENRESUME  mid-frame, from the menu:         everything's boards, ENGRUN
 ;   ENGCOLD   between frames, a table joined:   clear, then ENGNEXT
 CENTRY: lda     BSENT
@@ -144,7 +155,7 @@ GCP3A:  lda     BSREDRW
 GCP3B:  jsr     GEDGES
         jsr     GBOARDS
         lda     BSREDRW
-        ora     #$80            ; the text pass is due
+        ora     #$A0            ; bit 7 a pass is due, bit 5 the AUX plane
         sta     BSREDRW
         rts
 
@@ -154,7 +165,20 @@ GCP3B:  jsr     GEDGES
 ; rows in a third, with bits 2 and 3 carrying the rest. Eleven blank rows
 ; and ten composed ones in one vblank was an eighteen-line jump once a
 ; phase.
+;
+; The AUX plane is tested BEFORE anything else, and its bit cleared without
+; disturbing the others: the blank-everything stage below rewrites BSREDRW
+; wholesale, so an AUX pass staged behind it would be dropped on exactly the
+; screen change that needs it most.
 GCOMPT: lda     BSREDRW
+        and     #$20
+        beq     GCT0
+        jsr     GBAUX
+        lda     BSREDRW
+        and     #$DF
+        sta     BSREDRW         ; bit 7 still set: come back next frame
+        rts
+GCT0:   lda     BSREDRW
         and     #1
         beq     GCT1
         jsr     GCLRTX          ; everything: blank the rows first...
@@ -162,6 +186,9 @@ GCOMPT: lda     BSREDRW
         sta     BSREDRW
         rts
 GCT1:   lda     BSREDRW
+        and     #$10
+        bne     GCTFLT          ; the fleet strips, a pass of their own
+        lda     BSREDRW
         and     #8
         bne     GCTLOW          ; the third pass: the lower rows
         jsr     GSTAT
@@ -174,16 +201,25 @@ GCT1:   lda     BSREDRW
         jsr     GLMARKS         ; only the markers moved: two cells a row
         jmp     GCT2
 GCT1A:  jsr     GLABELS
-        lda     #$8C            ; ...and the lower rows next frame
+        lda     #$8C            ; ...and, next frame, whichever of the two
+        ldx     BSMODE          ;   lower halves this layout has
+        beq     GCT1B
+        lda     #$90
+GCT1B:  sta     BSREDRW
+        rts
+; The last pass of each layout. Two seats compose the lower rows every poll,
+; because the fleets live in them; the quadrant layout stages the strips
+; instead, a frame later again -- two twelve-character rows on the back of
+; the status row and the markers is the eighteen-line jump this file already
+; paid for once.
+GCT2:   lda     BSMODE
+        beq     GCTLOW
+        lda     #$90
         sta     BSREDRW
         rts
-GCTLOW: lda     BSMODE
-        bne     GCT3
-        jsr     GLOWER
+GCTLOW: jsr     GLOWER
         jmp     GCT3
-GCT2:   lda     BSMODE
-        bne     GCT3
-        jsr     GLOWER
+GCTFLT: jsr     GLFLEET
 GCT3:   lda     #0
         sta     BSREDRW
         rts
@@ -255,14 +291,21 @@ GE9:    lda     BSACT
         rts
 
 ; ---------------------------------------------------------------------------
-; GBOARDS -- the four slots, from the records.
+; GBOARDS -- the HIT and MID planes of the four slots, from the records.
+;
+; The AUX plane is GBAUX and a pass of its own. The two together are about
+; 2,100 cycles at four seats and the overscan a bank has between frames is
+; about 2,240 -- of which the network bank has already spent four lines by
+; the time it hands over, so the poll's frame came out three lines long, once
+; a poll, for as long as the quadrant layout has existed. Two seats fitted
+; and `make frames` was only ever run at two seats.
 GBOARDS: lda    BSCLASS
         cmp     #CLPLAY
         bcs     GB0
         rts                     ; lobby and placement: no gamefields exist
 GB0:    ldx     #0
 GB1:    cpx     BSPCNT
-        bcs     GB2
+        bcs     GB1X
         stx     BSIDX
         jsr     PLRECP          ; FNPTRL/H = the record, in the window
         lda     FNPTRL          ; src = its offset + PLFIELD, sixteen bits
@@ -284,8 +327,16 @@ GB1:    cpx     BSPCNT
         ldx     BSIDX
         inx
         jmp     GB1
-; AUX: cleared everywhere, then your hulls, the winner's at game over, and
-; the cursor on every live enemy.
+GB1X:   rts
+
+; GBAUX -- the AUX plane, in the vblank of the frame after: cleared
+; everywhere, then your hulls, the winner's at game over, and the cursor on
+; every live enemy. One frame behind the boards, which nobody can see, in
+; exchange for a frame that is 262 lines.
+GBAUX:  lda     BSCLASS
+        cmp     #CLPLAY
+        bcs     GB2
+        rts
 GB2:    ldx     #PFSLOTS-1
 GB3:    stx     BSIDX
         lda     #PFM_AUX
@@ -545,6 +596,41 @@ GLMCEL: ldy     #0
         lda     #FB_TCELL
         jmp     FNBLIT
 
+; ---------------------------------------------------------------------------
+; GLFLEET -- text rows 3 and 4: the fleet of each of the four seats as five
+; pips, under the name row of its pair. The kernel draws these three ink
+; lines high (dispgame.inc, PIPROW), which is why the sunk mark is '=' and
+; not '.'.
+;
+; GPIPS already emits a leading space and five pips -- six columns -- so two
+; of them fill the row exactly and the right-hand seat's pips land in columns
+; 7-11. Column 7 starts at clock 80, the board seam, so each seat's pips sit
+; over its own half.
+GLFLEET: lda    #RFLTA
+        jsr     FNROWA
+        ldx     #SLTL
+        jsr     GFSLOT
+        ldx     #SLTR
+        jsr     GFSLOT
+        jsr     FNENDW
+        lda     #RFLTB
+        jsr     FNROWA
+        ldx     #SLBL
+        jsr     GFSLOT
+        ldx     #SLBR
+        jsr     GFSLOT
+        jmp     FNENDW
+
+; GFSLOT -- six columns for the seat in slot X: a space and five pips, or six
+; spaces for an empty seat. GPIPS emits nothing at all before the gamefields
+; exist, which is what the lobby and the placement phase want.
+GFSLOT: jsr     SLPLYR
+        bmi     GFSP
+        tax
+        jmp     GPIPS
+GFSP:   lda     #NSHIPS+1
+        jmp     FNSPC
+
 ; SLPLYR -- A = the player in slot X, or $FF (N set) for nobody.
 SLPLYR: txa
         ldy     BSMODE
@@ -653,7 +739,8 @@ GP1:    lda     (FNPTRL),y
         beq     GP2
         lda     #'#'
         jmp     GP3
-GP2:    lda     #'.'
+GP2:    lda     #'='             ; a bar; '.' is the bottom font row alone
+                                ;   and the strips only render the top three
 GP3:    jsr     FNCHR
         iny
         cpy     #PLSHIPS+NSHIPS

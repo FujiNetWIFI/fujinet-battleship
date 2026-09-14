@@ -10,12 +10,14 @@
         INCLUDE "bsdefs.inc"
 
 BSBANK  EQU     BANKLOB
-BSHASUI EQU     1
+BSHASINP EQU    1
+BSHASUI EQU     0               ; it lists tables, not player records
 BSHASED EQU     1               ; it writes the joined table's id into a
                                 ;   cartridge path buffer
 BSHASNET EQU    0               ; BANKNET fetches for it
 BSHASCLS EQU    1
 BSHASSTR EQU    1
+BSHASRPL EQU    0
 BSHASDEC EQU    0
 
         INCLUDE "../build/tail.inc"

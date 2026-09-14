@@ -121,7 +121,9 @@ FNBARG: sta     FNRSEL+FH_BSL
         sta     FNRSEL+FH_BDH
         rts
 
-        IF      BSHASSTR
+; BSHASRPL, not BSHASSTR: only the composer streams the reply window into a
+; row. Every other bank that composes text composes it out of its own strings.
+        IF      BSHASRPL
 ; FNRPLA -- append up to Y bytes of the reply window at offset X to the row
 ; being composed, stopping at NUL. Pads the rest with spaces so a shorter
 ; value leaves no debris behind it.
@@ -257,7 +259,11 @@ BSPOW10: DW     10000
         DW      1
         ENDIF
 
-        IF      BSHASUI
+; BSHASINP, not BSHASUI: reading the stick and reading a player record out of
+; the reply window are wanted by different banks, and 104 bytes of input
+; scanning in the composer -- whose APPVBL is an rts -- was 104 bytes the
+; fleet rows needed. state.inc's helpers keep BSHASUI.
+        IF      BSHASINP
 ; -----------------------------------------------------------------------
 ; INSCAN -- fold the joystick and the console switches into one active-high
 ; byte in INCUR, and return only what is NEWLY pressed, so a held stick steps

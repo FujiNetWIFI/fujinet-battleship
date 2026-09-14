@@ -122,6 +122,9 @@ CELLNO: lda     BSCURY
         adc     BSCURX
         rts
 
+; BSHASUI is the REPLY-WINDOW half of what used to be one flag; the stick is
+; bslib.inc's BSHASINP. No bank but the game one wants both, and the place
+; bank wanting neither of these three is 118 bytes.
         IF      BSHASUI
 ; PLRECP -- FNPTRL/H = the address of player X's record in the reply window,
 ; phase-aware: ten bytes a record at GLPLYRS in the lobby, ten at GIPLYRS

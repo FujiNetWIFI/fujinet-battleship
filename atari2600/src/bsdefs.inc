@@ -126,8 +126,11 @@ BSNLEN  EQU     $B6             ; characters typed -- NAME BANK ONLY
 BSCLASS EQU     $B6             ; the screen class (CL*) -- GAME BANK ONLY
 SHIPS   EQU     $B7             ; the five staged placements, $B7-$BB, each
                                 ;   pos + 100*dir: PLACE and NET banks only
-BSREDRW EQU     $BC             ; the composer's flags: bit 0 everything,
-                                ;   bit 1 the names, bit 7 a text pass is due
+BSREDRW EQU     $BC             ; the composer's flags, one pass a frame:
+                                ;   bit 0 everything, bit 1 the names, bit 2
+                                ;   the whole name rows, bit 3 the lower rows,
+                                ;   bit 4 the fleet strips, bit 5 the AUX
+                                ;   plane, bit 7 a pass is due at all
 BSREQ2  EQU     $BD             ; the request staged for the next fetch, or
                                 ;   RQSTATE
 BSERR2  EQU     $BE             ; APICALL's result, parked across a switch
@@ -229,6 +232,8 @@ CSTATUS EQU     $1C             ; the status row
 RSTAT   EQU     0               ; the status line
 RLABA   EQU     1               ; names over board pair A
 RLABB   EQU     2               ; names over board pair B
+RFLTA   EQU     3               ; the fleet strip under each name row, three
+RFLTB   EQU     4               ;   ink lines, quadrant layout only
 RLOW0   EQU     15              ; the two-player layout's lower rows: 15-20
 NLOWROW EQU     6
 

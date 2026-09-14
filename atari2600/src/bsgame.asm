@@ -32,13 +32,16 @@
         INCLUDE "bsdefs.inc"
 
 BSBANK  EQU     BANKGAM
+BSHASINP EQU    1
 BSHASUI EQU     1
 BSHASED EQU     0
 BSHASNET EQU    0               ; BANKNET polls for it
 BSHASCLS EQU    0
 BSHASSTR EQU    0               ; BANKCMP composes for it
+BSHASRPL EQU    0
 BSHASDEC EQU    0
 SNDFULL EQU     1
+SNDLAST EQU     5               ; ...and the shot and the clock
 
         INCLUDE "../build/tail.inc"
 

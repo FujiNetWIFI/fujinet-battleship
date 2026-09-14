@@ -82,6 +82,11 @@ stampclaim() {
 
 # ---------------- the layout ROM: one flat 4K image ----------------
 if [ "${1:-}" = "layout" ]; then
+    # The baked tables and the baked fleet strips, from the picture in
+    # tools/mklayout.py. Generated here and not by hand: build/ is ignored, so
+    # a stale copy is the normal state of a fresh tree, and a stale one fails
+    # tools/pfcheck.py somewhere that looks like the kernel's fault.
+    python3 tools/mklayout.py > build/layoutpf.inc
     assemble layout
     bankfits layout $((0x1800))
     "$P2BIN" build/layout.p build/layout.bin -r '$1000-$1FFF' -l 0

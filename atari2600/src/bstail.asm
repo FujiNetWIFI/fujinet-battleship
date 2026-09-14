@@ -25,11 +25,13 @@
 ; bstrans.inc has no bank identity -- it IS the shared copy -- but it is
 ; assembled next to the same equates every bank uses.
 BSBANK  EQU     BANKLOB
+BSHASINP EQU    0
 BSHASUI EQU     0
 BSHASED EQU     0
 BSHASNET EQU    0
 BSHASCLS EQU    0
 BSHASSTR EQU    0
+BSHASRPL EQU    0
 BSHASDEC EQU    0
 
         INCLUDE "bscore.inc"

@@ -29,20 +29,32 @@
 ; difference -- and any overrun -- rather than moving the whole picture down
 ; the screen, which is what this family has paid for twice already.
 ;
-; Visible, three or four players (192):
-;    5  status row                (text row 0)
-;    2  gap
-;    5  names over pair A         (text row 1)
-;    1  lead-in: sprites blanked, water, the divider on
+; Visible, three or four players (192). Counted as WSYNCs, which is what the
+; raster sees; tools/pfcheck.py holds the same arithmetic and must move with
+; it.
+;    1  the unblank line
+;    6  status row                (text row 0: 5 ink + a seam)
+;    6  names over pair A         (text row 1)
+;    3  fleet strip               (text row 3: '#' afloat, '=' sunk)
+;    1  the strip's seam, WHICH IS ALSO the lead-in: sprites blanked,
+;       water on, the divider on
 ;   80  board pair A, rows 0-9
 ;    1  lead-out: playfield off, the divider off
-;    7  gap
-;    5  names over pair B         (text row 2)
-;    1  lead-in
+;    2  gap
+;    6  names over pair B         (text row 2)
+;    3  fleet strip               (text row 4)
+;    1  seam and lead-in
 ;   80  board pair B, rows 10-19
 ;    1  lead-out
-;    4  timed pad
-; Two players: one pair of 12-line cells (120), then text rows 15-20.
+;    1  timed pad
+; That is 191 lines of kernel in a band of 192, and the pad is the last one.
+; The count is fixed -- nothing in the visible band branches on data -- so
+; exact is safe where variable would not be, and `make frames` is what says
+; so. The gap was seven lines and the pad four before the strips; six of
+; those nine are what the two strips are made of.
+;
+; Two players: one pair of 12-line cells (120), then text rows 15-20, and no
+; strips -- the lower rows have carried the fleets as pips all along.
 
 ; ---------------- kernel timing constants ----------------
 ; Not taste. See disptext.inc.
@@ -266,11 +278,19 @@ DVBLP:  bit     TIMINT
         sta     COLUP0
         sta     COLUP1
 
-; ---- pair A: names, then the boards ----
+; ---- pair A: names, the fleet strip, then the boards ----
         ldy     #RLABA*FNTCLH
         jsr     TINK5
-        jsr     LEADIN
-        ldy     #0
+        lda     #CAUX           ; the strip is gold, like the hull brackets.
+        sta     COLUP0          ;   The name row's seam line has the cycles
+        sta     COLUP1          ;   for this and nothing is drawn on it.
+        lda     BSMODE
+        beq     DFA2
+        ldy     #RFLTA*FNTCLH
+        jsr     PIPROW          ; three ink lines AND the lead-in
+        jmp     DFA3
+DFA2:   jsr     LEADIN          ; two seats: the lower rows carry the fleets
+DFA3:   ldy     #0
         lda     #10
         sta     ROWEND
         lda     BSMODE
@@ -285,13 +305,17 @@ DVBLP:  bit     TIMINT
         lda     #CLABEL
         sta     COLUP0
         sta     COLUP1
-        ldx     #4
+        ldx     #1             ; the gap, shortened to pay for the strips
 DFGAP:  sta     WSYNC
         dex
         bne     DFGAP
         ldy     #RLABB*FNTCLH
         jsr     TINK5
-        jsr     LEADIN
+        lda     #CAUX
+        sta     COLUP0
+        sta     COLUP1
+        ldy     #RFLTB*FNTCLH
+        jsr     PIPROW
         ldy     #10
         lda     #20
         sta     ROWEND
@@ -348,11 +372,28 @@ DFPAD1: bit     TIMINT
 ; them, and the exit path is too long to do it on the last ink line -- a
 ; `jsr` after this routine's `rts` lands at cycle 79, which is a line lost
 ; without anything looking wrong.
-TINK5:  tsx
+;
+; TINKN is the same row with A ink lines instead of five, and it hands the
+; seam line to its caller WITHOUT blanking: PIPROW needs the water up before
+; pixel 0, which is earlier than the blanking has to be, and only the caller
+; knows that. TINK5 is TINKN plus the blanking, which is what every other row
+; wants. The extra jsr/rts costs twelve cycles of a line that has fifty-seven
+; spare.
+TINK5:  lda     #TINK
+        jsr     TINKN
+        lda     #0
+        sta     GRP0
+        sta     GRP1
+        sta     GRP0
+        iny                     ; past the blank sixth byte
+        rts
+
+TINKN:  tsx
         stx     SAVSP
+        sta     BSLINE          ; the ink count, until Y is added to it
         tya
         clc
-        adc     #TINK
+        adc     BSLINE
         sta     BSLINE          ; the first byte past the ink
 TI1:    sta     WSYNC
         lda     TP0,y           ; 4
@@ -378,13 +419,37 @@ TI1:    sta     WSYNC
         ldx     SAVSP           ; 3   -> 64
         txs                     ; 2   -> 66
         sta     WSYNC           ; 3   -> 69
-; the seam line: three writes, not two -- with VDELP set a write to GRP0
-; reloads the delayed GRP1
-        lda     #0
-        sta     GRP0
-        sta     GRP1
-        sta     GRP0
-        iny                     ; past the blank sixth byte
+        rts                     ; the caller owns the seam line, from cycle 6
+
+; ---------------------------------------------------------------------------
+; PIPROW -- the fleet strip whose first plane byte is Y: three ink lines, and
+; a seam line that is ALSO the board's lead-in. Replaces LEADIN in the
+; quadrant layout, so the strip costs three scanlines and not four.
+;
+; Three ink lines, because that is what the gap and the pad between them can
+; pay for. The font is a 3x5 glyph, so this is its top three rows: '#' is
+; {5,7,5} and '=' is {0,7,0} -- a hash and a bar, which is the whole
+; vocabulary the strip needs. Digits would NOT survive the clip; '8' and '9'
+; are both {7,5,7}.
+;
+; The order of this line is not taste. COLUBK must be written before pixel 0
+; at cycle 22.67; the sprites only have to be blanked before the text block
+; at clock 52, which is cycle 39. Doing the blanking first -- as LEADIN does,
+; where it is free -- puts the water in four clocks late and leaves a black
+; sliver down the left of the line.
+PIPROW: lda     #3
+        jsr     TINKN
+        lda     #CWATER         ; 2
+        sta     COLUBK          ; 5    before pixel 0 at 22
+        lda     #0              ; 7
+        sta     GRP0            ; 10   before the text block at 39
+        sta     GRP1            ; 13
+        sta     GRP0            ; 16
+        sta     COLUP1          ; 19   the divider's colour
+        lda     #$10            ; 21   one copy, two clocks wide
+        sta     NUSIZ1          ; 24
+        lda     #2              ; 26
+        sta     ENAM1           ; 29   before the divider at 49
         rts
 
 ; ---------------------------------------------------------------------------

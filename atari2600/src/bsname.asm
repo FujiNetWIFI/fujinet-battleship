@@ -15,11 +15,13 @@
         INCLUDE "bsdefs.inc"
 
 BSBANK  EQU     BANKNAM
-BSHASUI EQU     1
+BSHASINP EQU    1
+BSHASUI EQU     0               ; the keyboard reads no player record
 BSHASED EQU     1
 BSHASNET EQU    0               ; appkeys are FUJI device calls, not N:
 BSHASCLS EQU    1
 BSHASSTR EQU    1
+BSHASRPL EQU    0
 BSHASDEC EQU    0
 
         INCLUDE "../build/tail.inc"

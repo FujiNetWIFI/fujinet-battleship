@@ -15,7 +15,7 @@ BS_TABLE ?= AI1
 SRC := $(wildcard src/*.asm src/*.inc)
 
 .PHONY: all layout run runlayout shot drive drive4 frames resettest \
-        resetleave sounds emu hosttest clean
+        resetleave sounds emu hosttest clean frames4
 
 all: build/battleship.bin
 
@@ -44,9 +44,14 @@ drive: all
 	MAME=$(MAME_DIR) SECS=$(SECS) BS_TABLE=$(BS_TABLE) ./run.sh battleship drive
 drive4: all
 	MAME=$(MAME_DIR) SECS=$(SECS) BS_TABLE=AI3 ./run.sh battleship drive
-# Every frame must be 262 lines, through polls, shots and recomposes.
+# Every frame must be 262 lines, through polls, shots and recomposes. The
+# quadrant layout is the one with the fleet strips in it, and its kernel is
+# 191 lines of a band of 192, so frames4 is not optional.
 frames: all
 	MAME=$(MAME_DIR) SECS=$(SECS) BS_TABLE=$(BS_TABLE) \
+	    DRIVE_LUA=$(PWD)/emu/drive.lua ./run.sh battleship frames
+frames4: all
+	MAME=$(MAME_DIR) SECS=$(SECS) BS_TABLE=AI3 \
 	    DRIVE_LUA=$(PWD)/emu/drive.lua ./run.sh battleship frames
 # The cues, logged as they start, over a played game.
 sounds: all

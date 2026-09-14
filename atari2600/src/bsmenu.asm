@@ -18,11 +18,13 @@
         INCLUDE "bsdefs.inc"
 
 BSBANK  EQU     BANKMNU
-BSHASUI EQU     1
+BSHASINP EQU    1
+BSHASUI EQU     0               ; no player record is read here
 BSHASED EQU     0
 BSHASNET EQU    0               ; /leave is BANKNET's, like every request
 BSHASCLS EQU    1
 BSHASSTR EQU    1
+BSHASRPL EQU    0
 BSHASDEC EQU    0
 
         INCLUDE "../build/tail.inc"

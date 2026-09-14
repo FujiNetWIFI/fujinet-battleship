@@ -16,15 +16,23 @@ Usage: pfcheck.py snapshot.png [--mode 4|2]
 import sys
 
 sys.path.insert(0, __file__.rsplit('/', 1)[0])
-from mklayout import PICTURE, DIM  # noqa: E402
+from mklayout import PICTURE, FLEET, DIM  # noqa: E402
 
 # The frame, in scanlines from the status row's first ink line, from
-# dispgame.inc: a text row is six lines (five ink, one seam), then the
-# lead-in, then the boards.
-BOARD_A = 6 + 6 + 1                             # 13
+# dispgame.inc: a text row is six lines (five ink, one seam), then -- in the
+# quadrant layout -- a three-line fleet strip whose own seam line IS the
+# board's lead-in, then the boards.
+STRIP_A = 6 + 6                                 # 12
+STRIP_B = STRIP_A + 3 + 1 + 80 + 1 + 2 + 6      # 105
+BOARD_A = STRIP_A + 3 + 1                       # 16
+BOARD_B = STRIP_B + 3 + 1                       # 109
 CELL8 = 8
-BOARD_B = BOARD_A + 80 + 1 + 5 + 6 + 1          # 106
+# Two seats have no strips: a plain lead-in, and only the top pair.
+BOARD_A12 = 6 + 6 + 1                           # 13
 CELL12 = 12
+# The text block is 48 pixels at clocks 52-99, four clocks a column, and the
+# leftmost of a column's three ink pixels is the one sampled here.
+TEXT_X0, TEXT_W = 52, 4
 # MAME's a2600 snapshot: 176 pixels wide, clock 0 at x = 8, one pixel a clock.
 X0 = 8
 
@@ -84,9 +92,26 @@ def main():
     tall = (mode == 2)
     cellh = CELL12 if tall else CELL8
     slots = [0, 1] if tall else [0, 1, 2, 3]
+
+    # The fleet strips, quadrant layout only. Row 0 of '#' is {5,7,5} and of
+    # '=' is {0,0,0}, so the FIRST ink line alone separates afloat from sunk:
+    # ink where the fleet says afloat, black where it says sunk.
+    if not tall:
+        for slot in slots:
+            y = top + (STRIP_B if slot >> 1 else STRIP_A)
+            for i, ch in enumerate(FLEET[slot]):
+                col = (slot & 1) * 6 + 1 + i
+                x = X0 + TEXT_X0 + col * TEXT_W
+                got = classify(px[x, y])
+                want = 'K' if ch == '=' else 'Y'
+                if got != want:
+                    fails += 1
+                    print("FAIL: slot %d pip %d '%s': want %s got %s at (%d,%d) rgb %s"
+                          % (slot, i, ch, want, got, x, y, px[x, y]))
+
     for slot in slots:
         half, pair = slot & 1, slot >> 1
-        y0 = top + (BOARD_B if pair else BOARD_A)
+        y0 = top + (BOARD_B if pair else (BOARD_A12 if tall else BOARD_A))
         for cy in range(DIM):
             for cx in range(DIM):
                 ch = PICTURE[slot][cy][cx]
@@ -116,8 +141,9 @@ def main():
     if fails:
         print("FAIL: %d cell lines differ" % fails)
         return 1
-    print("PASS: %d boards, every cell line the colour the picture says, divider at 79-80"
-          % len(slots))
+    print("PASS: %d boards, every cell line the colour the picture says, "
+          "divider at 79-80%s"
+          % (len(slots), "" if tall else ", fleet strips on their scanlines"))
     return 0
 
 

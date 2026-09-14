@@ -21,11 +21,13 @@
         INCLUDE "fujinet.inc"
         INCLUDE "bsdefs.inc"
 BSBANK  EQU     BANKGAM
-BSHASUI EQU     1
+BSHASINP EQU    1               ; the switches pick the layout
+BSHASUI EQU     0               ; the tables are baked in: no reply window
 BSHASED EQU     0
 BSHASNET EQU    0
 BSHASCLS EQU    0
 BSHASSTR EQU    1
+BSHASRPL EQU    0
 BSHASDEC EQU    0
 ; No build/tail.inc here: this ROM assembles the tail body itself at the
 ; bottom of the file, so the labels are the real thing.
@@ -97,7 +99,7 @@ LSTR:   DB      "YOUR TURN 45    "
         DB      "DESTROYER       "
         DB      "                "
         DB      "YOU  #####      "
-        DB      "BOB  ##.#.      "
+        DB      "BOB  ##=#=      "
         DB      "FIRE=ATTACK     "
 
 ; ---------------------------------------------------------------------------
