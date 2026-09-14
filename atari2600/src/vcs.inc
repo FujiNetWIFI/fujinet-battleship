@@ -80,6 +80,12 @@ SWACNT  EQU     $0281
 SWCHB   EQU     $0282           ; bit 0 RESET, bit 1 SELECT (low = pressed)
 SWBCNT  EQU     $0283
 INTIM   EQU     $0284
+TIMINT  EQU     $0285           ; bit 7 latches on the timer's underflow and
+                                ;   stays latched until INTIM is read or the
+                                ;   timer is rewritten -- which is why the
+                                ;   display kernel polls THIS and not INTIM:
+                                ;   past zero INTIM free-runs at a tick a
+                                ;   cycle and a poll can walk straight over it
 TIM1T   EQU     $0294
 TIM8T   EQU     $0295
 TIM64T  EQU     $0296
