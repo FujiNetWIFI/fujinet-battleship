@@ -31,7 +31,7 @@ MAME=${MAME:-$HOME/Workspace/mame}
 
 pkill -f "mame a2600" 2>/dev/null || true
 
-args=(a2600 -cartslot "${SLOT:-fujinet}" -cart "$HERE/build/$ROM.bin"
+args=(a2600 -window -cartslot "${SLOT:-fujinet}" -cart "$HERE/build/$ROM.bin"
       -snapshot_directory "$HERE/build/snap")
 
 if [ -n "$SCRIPT" ]; then
