@@ -498,7 +498,12 @@ void showInGameMenuScreen()
 
             case 'h':
             case 'H':
+                // Back to the menu afterwards (i = 2 redraws it), not on
+                // into 'q': reading the rules must not leave the table
                 showHelpScreen();
+                i = 2;
+                break;
+
             case 'q':
             case 'Q':
                 resetScreen();
