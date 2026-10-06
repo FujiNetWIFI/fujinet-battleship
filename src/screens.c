@@ -35,6 +35,10 @@
 #define MENU_SOUND_OFF_TEXT "  S: sound OFF"
 #endif
 
+#ifndef MENU_CLOSE_TEXT
+#define MENU_CLOSE_TEXT "press TRIGGER/SPACE to close"
+#endif
+
 // Logo vertical position - set in [platform]/vars.h to override if needed
 #ifndef LOGO_Y
 #define LOGO_Y 1
@@ -460,7 +464,7 @@ void showInGameMenuScreen()
 
         drawBox(INGAME_MENU_X - 2, HEIGHT / 2 - 5, 19, y - (HEIGHT / 2 - 5) + 1);
 
-        centerTextAlt(HEIGHT - 2, "press TRIGGER/SPACE to close");
+        centerTextAlt(HEIGHT - 2, MENU_CLOSE_TEXT);
 
         // centerTextAlt(y + 6, tempBuffer);
         clearCommonInput();
@@ -494,7 +498,12 @@ void showInGameMenuScreen()
 
             case 'h':
             case 'H':
+                // Back to the menu afterwards (i = 2 redraws it), not on
+                // into 'q': reading the rules must not leave the table
                 showHelpScreen();
+                i = 2;
+                break;
+
             case 'q':
             case 'Q':
                 resetScreen();

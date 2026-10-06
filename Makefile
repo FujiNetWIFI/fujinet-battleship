@@ -90,6 +90,38 @@ LDFLAGS_EXTRA_COLECO += -m \
   -pragma-define:CLIB_EXIT_STACK_SIZE=0 \
   -pragma-define:CLIB_DEFAULT_SCREEN_MODE=-1
 
+## NES (cc65, FujiNet mailbox cartridge). Not in PLATFORMS: like the
+## ColecoVision it needs fujinet-lib-experimental -- and the add-nes branch of
+## it, the only one with the nes bus -- so build with
+##   make nes FUJINET_LIB=$(HOME)/Workspace/fujinet-lib-experimental
+## src/nes is guarded by BUILD_NES the way src/coleco is. The linker config is
+## the lib's FujiNet layout with the CHR-ROM split so the game's own pattern
+## table (src/nes/chr.s, from the msdos art) sits at $1000 beside the cc65 font
+## the runtime insists on (see src/nes/nes.cfg).
+CFLAGS_EXTRA_NES = -DBUILD_NES -DCUSTOM_FUJINET_CALLS -Os
+NES_CFG = src/nes/nes.cfg
+
+## Sega Master System (z88dk +sms, FujiNet mailbox cartridge). Not in
+## PLATFORMS: the sms bus lives on the add-sms branch of
+## fujinet-lib-experimental (a worktree of it at ~/Workspace/fnlib-sms), so
+## build with
+##   make PLATFORMS=sms sms FUJINET_LIB=$(HOME)/Workspace/fnlib-sms
+## src/sms is guarded by BUILD_SMS the way src/coleco is, and gets the same
+## vars.h quoting hack. The image is a flat 32K: mekkogx/sms-romstamp.py stamps
+## the "FUJI" claim at $7FDC and keeps $7FD8-$7FEF clear for it. The art is the
+## CoCo 3's 16-colour sheet, which src/sms/mktiles.py turns into Mode 4 tiles.
+ifeq ($(PLATFORM),sms)
+  CFLAGS =
+endif
+CFLAGS_EXTRA_SMS = -DBUILD_SMS -DCUSTOM_FUJINET_CALLS -O3
+# 8K of RAM at $C000, stack from $DFF0 down; -m leaves the map beside the
+# image so BSS and the code's end ($7FD8 is the limit) can be read off. No
+# stdio: the game drives the VDP itself (src/sms/graphics.c).
+LDFLAGS_EXTRA_SMS += -m \
+  -pragma-define:CRT_ENABLE_STDIO=0 \
+  -pragma-define:CLIB_FOPEN_MAX=0 \
+  -pragma-define:CLIB_EXIT_STACK_SIZE=0
+
 ## Coco specific flags (cmoc)
 CFLAGS_EXTRA_COCO = \
 	-Wno-assign-in-condition \
@@ -148,6 +180,16 @@ $(PLATFORM)/r2r::
 #   COLECO ONLY - regenerate the charset from the msdos art
 ifeq ($(PLATFORM),coleco)
 	python3 support/coleco/make_charset.py
+endif
+
+#   NES ONLY - regenerate the pattern table from the msdos art
+ifeq ($(PLATFORM),nes)
+	python3 src/nes/mkchr.py
+endif
+
+#   SMS ONLY - regenerate the Mode 4 tile set from the CoCo 3 art
+ifeq ($(PLATFORM),sms)
+	python3 src/sms/mktiles.py
 endif
 
 #   COCO ONLY - copy proper file for Coco1/2 vs Coco3	
@@ -256,6 +298,63 @@ coleco-smoke:
 	./mame coleco -cartslot fujinet -cart $(COLECO_ROM) \
 	    -video none -sound none -nothrottle -seconds_to_run $(SECS) \
 	    -autoboot_script $(CURDIR)/support/coleco/smoke.lua
+
+# NES: headless smoke test in MAME's nes driver, the same shape as
+# coleco-smoke. The MAME tree needs fujinet-firmware/pico/nes/emu/apply.sh run
+# against it once for -nes_slot fujinet to exist. The screen is read out of the
+# nametable through support/nes/tilemap.lua, which mkchr.py writes.
+#
+#   make nes-smoke                           print the screen
+#   make nes-smoke EXPECT="FUJI BATTLESHIP"  and assert on it
+#   make nes-smoke SCRIPT="a,wait5,a"        drive the joypad first
+#                                            (a b select start up down left right waitN)
+#   make nes-play                            play it in a window, with sound
+NES_ROM := $(CURDIR)/r2r/nes/$(PRODUCT).nes
+
+.PHONY: nes-smoke nes-play
+
+nes-smoke:
+	cd $(MAME_DIR) && \
+	FBS_TILEMAP=$(CURDIR)/support/nes/tilemap.lua FBS_AT=$(AT) FBS_EXPECT="$(EXPECT)" \
+	FBS_SCRIPT="$(SCRIPT)" FBS_SETTLE=$(SETTLE) FBS_SNAP="$(SNAP)" \
+	./mame nes -nes_slot fujinet -cart $(NES_ROM) \
+	    -video none -sound none -nothrottle -seconds_to_run $(SECS) \
+	    -autoboot_script $(CURDIR)/support/nes/smoke.lua
+
+nes-play:
+	cd $(MAME_DIR) && ./mame nes -nes_slot fujinet -cart $(NES_ROM) -window
+
+# Sega Master System: headless smoke test in MAME's sms1 driver, the same shape
+# as nes-smoke. The MAME tree needs fujinet-firmware/pico/sms/emu/apply.sh
+# (add-sms branch) run against it once for -slot fujinet to exist. A claimed
+# 32K image is served the way the cartridge serves CONFIG. The screen is read
+# out of the name table through support/sms/tilemap.lua, which mktiles.py
+# writes.
+#
+#   make sms-smoke                           print the screen
+#   make sms-smoke EXPECT="FUJI BATTLESHIP"  and assert on it
+#   make sms-smoke SCRIPT="b1,wait5,pause"   drive the joypad first
+#                                            (b1 b2 pause up down left right,
+#                                             b2+X chords, waitN, snap)
+#   make sms-smoke NOTHROTTLE=               run at real speed, so the server's
+#                                            wall-clock lobby countdown keeps up
+#   SECS counts presses, not waitN steps: pass SECS= for scripts that wait
+#   make sms-play                            play it in a window, with sound
+SMS_ROM := $(CURDIR)/r2r/sms/$(PRODUCT).sms
+NOTHROTTLE ?= -nothrottle
+
+.PHONY: sms-smoke sms-play
+
+sms-smoke:
+	cd $(MAME_DIR) && \
+	FBS_TILEMAP=$(CURDIR)/support/sms/tilemap.lua FBS_AT=$(AT) FBS_EXPECT="$(EXPECT)" \
+	FBS_SCRIPT="$(SCRIPT)" FBS_SETTLE=$(SETTLE) FBS_SNAP="$(SNAP)" \
+	./mame sms1 -slot fujinet -cart $(SMS_ROM) \
+	    -video none -sound none $(NOTHROTTLE) -seconds_to_run $(SECS) \
+	    -autoboot_script $(CURDIR)/support/sms/smoke.lua
+
+sms-play:
+	cd $(MAME_DIR) && ./mame sms1 -slot fujinet -cart $(SMS_ROM) -window
 
 # Reset FujiNet-PC
 reset-fn:

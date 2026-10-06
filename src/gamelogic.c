@@ -19,6 +19,9 @@
 #ifndef ROTATE_PROMPT_TEXT
 #define ROTATE_PROMPT_TEXT "press R to rotate"
 #endif
+#ifndef READY_PROMPT_TEXT
+#define READY_PROMPT_TEXT "press TRIGGER/SPACE when ready"
+#endif
 
 uint8_t posX = 0, posY = 0, inputField_done, validX;
 uint8_t shipPlacements[5] = {0, 0, 0, 0, 0};
@@ -104,7 +107,7 @@ void renderLobby()
 
         drawLine(READY_LEFT, 7, 16);
         centerTextAlt(HEIGHT - 4, "press " ESCAPE " for menu");
-        centerTextAlt(HEIGHT - 1, "press TRIGGER/SPACE when ready");
+        centerTextAlt(HEIGHT - 1, READY_PROMPT_TEXT);
 
         // Reset ship placement ahead of next screen
         memset(shipPlacements, 0, sizeof(shipPlacements));

@@ -42,9 +42,10 @@ unsigned char kbhit (void);
  * KEY_* case in the input switch would ever match. */
 unsigned char cgetc (void);
 
-#elif defined(BUILD_COLECO)
+#elif defined(BUILD_COLECO) || defined(BUILD_NES) || defined(BUILD_SMS)
 // No keyboard at all: src/coleco/input.c synthesizes key codes from the
-// twelve-key keypad and the second fire button. unsigned for the same
+// twelve-key keypad and the second fire button, src/nes/input.c and
+// src/sms/input.c from the joypad's buttons. unsigned for the same
 // sign-extension reason as the Adam above.
 #include <stdlib.h>
 #include <stdio.h>
