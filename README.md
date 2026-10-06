@@ -9,6 +9,7 @@ This is a WIP cross platform game client for the Fuji Battleships server.
 * **CoCo**
 * **C64** (WIP)
 * **MS-Dos**
+* **NES** (FujiNet NES cartridge)
 * *Please contribute to add more!*
 
 ### To Build
@@ -26,6 +27,16 @@ The distribution disk includes two binaries and a small loader to detect Coco 1/
 * 	CoCo 3: 		`make coco3`
 *   Combined Disk:  `make coco-dist`
 *   Test Disk:      `make coco-dist test-coco-dist`
+
+### NES
+Built with cc65 against the `add-nes` branch of fujinet-lib-experimental (the only lib with the NES cartridge bus):
+* `make PLATFORMS=nes nes FUJINET_LIB=$HOME/Workspace/fujinet-lib-experimental`
+
+The output is `r2r/nes/fbs.nes` (NROM, 32K PRG + 8K CHR), stamped with the "FUJI" claim the cartridge needs. The art is the MS-DOS sheet converted by `src/nes/mkchr.py`, which runs before every build. Test in MAME with the FujiNet NES slot against fujinet-pc:
+* `make nes-smoke EXPECT="FUJI BATTLESHIP" [SCRIPT="a,wait5,select+start"] [SNAP=/path/shot.png]`
+* `make nes-play`
+
+Controls: d-pad moves, A selects/fires, B refreshes/rotates, START opens the in-game menu, SELECT changes name, SELECT+A help, SELECT+B sound, SELECT+START quit.
 
 ### Build Output - in /r2r
 
