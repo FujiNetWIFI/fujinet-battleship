@@ -122,6 +122,15 @@ LDFLAGS_EXTRA_SMS += -m \
   -pragma-define:CLIB_FOPEN_MAX=0 \
   -pragma-define:CLIB_EXIT_STACK_SIZE=0
 
+## Atari 7800 (cc65, FujiNet 7800 cartridge). Not in PLATFORMS: it needs the
+## add-atari7800 branch of fujinet-lib-experimental, the only lib with the
+## atari7800 bus, so build with
+##   make PLATFORMS=atari7800 atari7800 FUJINET_LIB=<that checkout>
+## src/atari7800 is guarded by BUILD_ATARI7800 the way src/nes is. The screen
+## is the shared MARIA engine (src/atari7800/maria.s), its 128 tiles made from
+## the msdos art by src/atari7800/mkchr.py.
+CFLAGS_EXTRA_ATARI7800 = -DBUILD_ATARI7800 -DCUSTOM_FUJINET_CALLS -Os
+
 ## Coco specific flags (cmoc)
 CFLAGS_EXTRA_COCO = \
 	-Wno-assign-in-condition \
@@ -190,6 +199,11 @@ endif
 #   SMS ONLY - regenerate the Mode 4 tile set from the CoCo 3 art
 ifeq ($(PLATFORM),sms)
 	python3 src/sms/mktiles.py
+endif
+
+#   ATARI 7800 ONLY - regenerate the tile set from the msdos art
+ifeq ($(PLATFORM),atari7800)
+	python3 src/atari7800/mkchr.py
 endif
 
 #   COCO ONLY - copy proper file for Coco1/2 vs Coco3	
@@ -355,6 +369,46 @@ sms-smoke:
 
 sms-play:
 	cd $(MAME_DIR) && ./mame sms1 -slot fujinet -cart $(SMS_ROM) -window
+
+# Atari 7800: headless smoke test in MAME's a7800 driver, the same shape as
+# nes-smoke. The MAME tree (a single-driver a7800 build) needs
+# fujinet-firmware/pico/atari-7800/emu/apply.sh run against it once for
+# -cartslot fujinet to exist; the cartridge dials fujinet-pc's BoIP at
+# FUJINET_TCP (default 127.0.0.1:9995). The screen is read out of the MARIA
+# engine's map through support/atari7800/tilemap.lua, which mkchr.py writes.
+#
+#   make atari7800-smoke                           print the screen
+#   make atari7800-smoke EXPECT="FUJI BATTLESHIP"  and assert on it
+#   make atari7800-smoke SCRIPT="until:ai_-_1_on_1,down,fire"
+#                                  drive the joystick first (the steps are in
+#                                  support/atari7800/smoke.lua's header)
+#   make atari7800-smoke A7800_SYSTEM=a7800p       on a PAL console
+#   make atari7800-play                            play it in a window, with sound
+A7800_MAME_DIR ?= $(HOME)/Workspace/mame-a7800
+A7800_MAME     ?= ./a7800
+A7800_SYSTEM   ?= a7800
+A7800_ROMS     ?= $(HOME)/Workspace/mame/roms
+A7800_SECS     ?= 600
+A7800_A78      := $(CURDIR)/r2r/atari7800/$(PRODUCT).a78
+A7800_OUT      := $(CURDIR)/build/atari7800/mame
+A7800_ARGS      = $(A7800_SYSTEM) -rompath $(A7800_ROMS) -cartslot fujinet -cart $(A7800_A78) \
+	-snapshot_directory $(A7800_OUT)/snap -nvram_directory $(A7800_OUT)/nvram \
+	-cfg_directory $(A7800_OUT)/cfg
+
+.PHONY: atari7800-smoke atari7800-play
+
+atari7800-smoke:
+	mkdir -p $(A7800_OUT)/snap $(A7800_OUT)/nvram $(A7800_OUT)/cfg
+	cd $(A7800_MAME_DIR) && \
+	FBS_TILEMAP=$(CURDIR)/support/atari7800/tilemap.lua \
+	FBS_MAPFILE=$(CURDIR)/r2r/atari7800/$(PRODUCT).map FBS_AT=$(AT) \
+	FBS_EXPECT="$(EXPECT)" FBS_SCRIPT="$(SCRIPT)" FBS_SETTLE=$(SETTLE) FBS_SNAP="$(SNAP)" \
+	$(A7800_MAME) $(A7800_ARGS) -video none -sound none -nothrottle \
+	    -seconds_to_run $(A7800_SECS) -autoboot_script $(CURDIR)/support/atari7800/smoke.lua
+
+atari7800-play:
+	mkdir -p $(A7800_OUT)/snap $(A7800_OUT)/nvram $(A7800_OUT)/cfg
+	cd $(A7800_MAME_DIR) && $(A7800_MAME) $(A7800_ARGS) -window -nomax
 
 # Reset FujiNet-PC
 reset-fn:
