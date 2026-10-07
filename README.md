@@ -11,6 +11,7 @@ This is a WIP cross platform game client for the Fuji Battleships server.
 * **MS-Dos**
 * **NES** (FujiNet NES cartridge)
 * **Sega Master System** (FujiNet SMS cartridge)
+* **Atari 7800** (FujiNet 7800 cartridge)
 * *Please contribute to add more!*
 
 ### To Build
@@ -49,6 +50,16 @@ The output is `r2r/sms/fbs.sms`, a flat 32K image stamped with the "FUJI" claim 
 * `make sms-play`
 
 Controls: d-pad moves, 1 selects/fires/readies, 2 refreshes/rotates, Pause opens the in-game menu. Holding 2 shifts: 2+Up help, 2+Down sound, 2+Left/Right change name, 2+1 quit.
+
+### Atari 7800
+Built with cc65 against the `add-atari7800` branch of fujinet-lib-experimental (the only lib with the 7800 cartridge bus and its crt0; the linker config and romstamp are in `mekkogx/`):
+* `make PLATFORMS=atari7800 atari7800 FUJINET_LIB=<a checkout of that branch>`
+
+The output is `r2r/atari7800/fbs.bin` (32K at $8000, for the cartridge) and `r2r/atari7800/fbs.a78` (for MAME), stamped with the "FUJI" claim and checked for stores to $00-$1F. The screen is the shared MARIA text and tile engine (`src/atari7800/maria.s`); `src/atari7800/mkchr.py` fits the MS-DOS art into its 128 tiles and two palettes before every build. Sound is the cartridge's POKEY. Test in MAME with the FujiNet 7800 cartridge against fujinet-pc:
+* `make atari7800-smoke EXPECT="FUJI BATTLESHIP" [SCRIPT="until:ai_-_1_on_1,down,fire"] [SNAP=/path/shot.png] [A7800_SYSTEM=a7800p]`
+* `make atari7800-play`
+
+Controls: joystick moves, button 1 selects/fires, button 2 (or RESET) refreshes/rotates, PAUSE opens the in-game menu, SELECT changes name, SELECT+1 help, SELECT+2 sound, SELECT+PAUSE quit.
 
 ### Build Output - in /r2r
 
