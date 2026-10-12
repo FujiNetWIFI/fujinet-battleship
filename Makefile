@@ -122,6 +122,36 @@ LDFLAGS_EXTRA_SMS += -m \
   -pragma-define:CLIB_FOPEN_MAX=0 \
   -pragma-define:CLIB_EXIT_STACK_SIZE=0
 
+## Heathkit H89 (z88dk +hdos / +cpm, H89 FujiNet card on the 8255 at 0xD0).
+## Not in PLATFORMS: the h89 bus is on the h89-support branch of fujinet-lib
+## (checked out at ~/Workspace/fujinet-lib), so build with
+##   make PLATFORMS=h89-hdos h89-hdos      HDOS:  r2r/h89-hdos/fbs.abs + fbs.h8d
+##   make PLATFORMS=h89-cpm h89-cpm        CP/M:  r2r/h89-cpm/fbs.com + fbs.h8d
+## Both builds share src/h89 through the combos below, and src/h89 is guarded
+## by __H89__ (which both platform .mk files define; the lib keys on it too).
+## The game draws on the H19 terminal with its graphics characters and escape
+## codes; the .h8d is a 100K H17 data disk (MOUNT SY1: / RUN SY1:FBS.ABS under
+## HDOS, B:FBS under CP/M).
+PLATFORM_COMBOS += h89-cpm+=h89 h89-hdos+=h89
+ifneq ($(filter h89-cpm h89-hdos,$(PLATFORM)),)
+  CFLAGS =
+  FUJINET_LIB = $(HOME)/Workspace/fujinet-lib
+endif
+CFLAGS_EXTRA_H89-CPM = -DCUSTOM_FUJINET_CALLS -O3
+CFLAGS_EXTRA_H89-HDOS = -DCUSTOM_FUJINET_CALLS -O3
+# No stdio or file handles: the game talks to the console itself
+# (src/h89/console.c). -m leaves the map beside the program so the end of BSS
+# can be checked against the OS's top of memory.
+H89_LDFLAGS = -m \
+  -pragma-define:CRT_ENABLE_STDIO=0 \
+  -pragma-define:CLIB_FOPEN_MAX=0 \
+  -pragma-define:CLIB_OPEN_MAX=0 \
+  -pragma-define:CLIB_EXIT_STACK_SIZE=0 \
+  -pragma-define:CRT_ENABLE_COMMANDLINE=0
+LDFLAGS_EXTRA_H89-CPM = $(H89_LDFLAGS)
+LDFLAGS_EXTRA_H89-HDOS = $(H89_LDFLAGS)
+H89_APPMAKE ?= z88dk-appmake
+
 ## Coco specific flags (cmoc)
 CFLAGS_EXTRA_COCO = \
 	-Wno-assign-in-condition \
@@ -254,6 +284,25 @@ msdos/disk-post::
 #	Mount the disk in FujiNet-PC (assumes host 1 is SD)
 	curl -s "http://localhost:8005/browse/host/1/$(PRODUCT).img?action=newmount&slot=1&mode=r" >/dev/null 2>&1
 	curl -s "http://localhost:8005/mount?mountall=1&redirect=1" >/dev/null 2>&1
+
+# H89: pack the program onto a 100K H17 data disk.
+# HDOS: appmake +hdos wants the bare program (the .abs less its 8-byte
+# header: FF 00, load, length, entry) and the load address, and names the
+# file after -o -- hence the cd.
+h89-hdos/r2r-post::
+	tail -c +9 $(EXECUTABLE) > $(R2R_PD)/$(PRODUCT).bin
+	cd $(R2R_PD) && $(H89_APPMAKE) +hdos -b $(PRODUCT).bin \
+	  --org $$(od -An -tu2 -j2 -N2 $(PRODUCT).abs | tr -d ' ') -o $(PRODUCT_UPPER)
+	rm -f $(R2R_PD)/$(PRODUCT).bin
+	@echo "$(R2R_PD)/$(PRODUCT).h8d: MOUNT SY1: then RUN SY1:$(PRODUCT_UPPER).ABS"
+
+# CP/M: the hz89 format (H17, 40 tracks, 3 boot tracks), then mark the empty
+# directory entries appmake leaves zeroed as erased (support/h89).
+h89-cpm/r2r-post::
+	cd $(R2R_PD) && $(H89_APPMAKE) +cpmdisk -f hz89 --container raw --no-com-file \
+	  -b $(PRODUCT).com -o $(PRODUCT).h8d
+	python3 -I support/h89/cpm-dir-fixup.py $(R2R_PD)/$(PRODUCT).h8d
+	@echo "$(R2R_PD)/$(PRODUCT).h8d: B:$(PRODUCT_UPPER)"
 
 apple2/disk-post::
 # HACK - MekkoGX Currently doesn't use the preferred bootable PO for Apple II, so manually creating
