@@ -12,6 +12,7 @@ This is a WIP cross platform game client for the Fuji Battleships server.
 * **NES** (FujiNet NES cartridge)
 * **Sega Master System** (FujiNet SMS cartridge)
 * **Atari 7800** (FujiNet 7800 cartridge)
+* **Atari 5200** (FujiNet 5200 cartridge)
 * *Please contribute to add more!*
 
 ### To Build
@@ -60,6 +61,16 @@ The output is `r2r/atari7800/fbs.bin` (32K at $8000, for the cartridge) and `r2r
 * `make atari7800-play`
 
 Controls: joystick moves, button 1 selects/fires, button 2 (or RESET) refreshes/rotates, PAUSE opens the in-game menu, SELECT changes name, SELECT+1 help, SELECT+2 sound, SELECT+PAUSE quit.
+
+### Atari 5200
+Built with cc65 against the `atari5200` target of fujinet-lib-experimental (the only lib with the 5200 cartridge bus and its crt0; the linker config and romstamp are in `mekkogx/`):
+* `make PLATFORMS=atari5200 atari5200 FUJINET_LIB=<a checkout of that branch>`
+
+The output is `r2r/atari5200/fbs.bin`, a flat 32K image at $4000-$BFFF for the cartridge and MAME's `-cart`, checked for the "FUJI" claim and for stores into the cart window. The screen is the Atari 8-bit's: ANTIC mode 4 with `support/atari/charset.fnt`, its charset copy, screen and player graphics in the top 4K of RAM. Test in MAME's `a5200` driver with the FujiNet 5200 cartridge against fujinet-pc:
+* `make atari5200-smoke EXPECT="FUJI BATTLESHIP" [SCRIPT="until:ai_-_1_on_1,down,fire"] [SNAP=/path/shot.png]`
+* `make atari5200-play`
+
+Controls: stick moves, top fire (or # or START) selects/fires/readies, lower fire (or 1) refreshes/rotates, PAUSE (or *) opens the in-game menu, 2 help, 3 sound, 4 changes name, 5 quit. Name entry is an on-screen keyboard: top fire types, lower fire or * deletes, the digits type themselves, START or # accepts.
 
 ### Build Output - in /r2r
 
