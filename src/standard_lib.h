@@ -42,11 +42,13 @@ unsigned char kbhit (void);
  * KEY_* case in the input switch would ever match. */
 unsigned char cgetc (void);
 
-#elif defined(BUILD_COLECO) || defined(BUILD_NES) || defined(BUILD_SMS)
+#elif defined(BUILD_COLECO) || defined(BUILD_NES) || defined(BUILD_SMS) || defined(BUILD_ATARI7800) || defined(BUILD_ATARI5200)
 // No keyboard at all: src/coleco/input.c synthesizes key codes from the
 // twelve-key keypad and the second fire button, src/nes/input.c and
-// src/sms/input.c from the joypad's buttons. unsigned for the same
-// sign-extension reason as the Adam above.
+// src/sms/input.c from the joypad's buttons, src/atari7800/input.c from the
+// joystick's buttons and the console switches, src/atari5200/input.c from
+// the fire buttons and the keypad. unsigned for the same sign-extension
+// reason as the Adam above.
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
