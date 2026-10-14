@@ -34,7 +34,7 @@ endef
 
 PRODUCT = fbs
 PRODUCT_UPPER = FBS
-PLATFORMS = coco atari apple2 c64 dragon
+PLATFORMS = coco atari apple2 c64 adam dragon
 
 PLATFORM_COMBOS = \
   dragon+=coco
@@ -59,6 +59,91 @@ CFLAGS += -DPLATFORM_VARS="\"../$(PLATFORM)/vars.h\""
 ifeq ($(PLATFORM),msdos)
   CFLAGS =
 endif
+
+## Adam (z88dk) - same vars.h hack; build against the local fujinet-lib tree
+ifeq ($(PLATFORM),adam)
+  CFLAGS =
+  FUJINET_LIB = ../fujinet-lib/build
+endif
+LDFLAGS_EXTRA_ADAM = -m
+
+## ColecoVision (z88dk +coleco, FujiNet mailbox cartridge). Not in PLATFORMS:
+## it needs fujinet-lib-experimental (the only lib with the coleco bus), so
+## build with either
+##   ./make-exp coleco                                      (clones + builds the lib)
+##   make coleco FUJINET_LIB=$(HOME)/Workspace/fujinet-lib-experimental
+## z88dk puts -D__COLECO__ in the target-wide OPTIONS line, so the Adam
+## subtype defines it too -- __COLECO__ alone does not mean ColecoVision.
+## src/coleco is therefore guarded by BUILD_COLECO.
+ifeq ($(PLATFORM),coleco)
+  CFLAGS =
+endif
+CFLAGS_EXTRA_COLECO = -DBUILD_COLECO -DCUSTOM_FUJINET_CALLS -O3
+# The console has 1K of RAM and the BIOS owns both ends of it: $7000-$702B is
+# the cartridge header's own tables, $73B9-$73FF is BIOS scratch, and what is
+# left -- 908 bytes -- holds BSS, DATA and the C stack. -m leaves a map next to
+# the image so that total can actually be read off. No generic console: the
+# game drives the VDP itself (src/coleco/graphics.c), so the crt0 is told to
+# leave the screen mode alone.
+LDFLAGS_EXTRA_COLECO += -m \
+  -pragma-define:CRT_ORG_BSS=0x702C \
+  -pragma-define:REGISTER_SP=0x73B8 \
+  -pragma-define:CRT_ENABLE_STDIO=0 \
+  -pragma-define:CLIB_FOPEN_MAX=0 \
+  -pragma-define:CLIB_EXIT_STACK_SIZE=0 \
+  -pragma-define:CLIB_DEFAULT_SCREEN_MODE=-1
+
+## NES (cc65, FujiNet mailbox cartridge). Not in PLATFORMS: like the
+## ColecoVision it needs fujinet-lib-experimental -- and the add-nes branch of
+## it, the only one with the nes bus -- so build with
+##   make nes FUJINET_LIB=$(HOME)/Workspace/fujinet-lib-experimental
+## src/nes is guarded by BUILD_NES the way src/coleco is. The linker config is
+## the lib's FujiNet layout with the CHR-ROM split so the game's own pattern
+## table (src/nes/chr.s, from the msdos art) sits at $1000 beside the cc65 font
+## the runtime insists on (see src/nes/nes.cfg).
+CFLAGS_EXTRA_NES = -DBUILD_NES -DCUSTOM_FUJINET_CALLS -Os
+NES_CFG = src/nes/nes.cfg
+
+## Sega Master System (z88dk +sms, FujiNet mailbox cartridge). Not in
+## PLATFORMS: the sms bus lives on the add-sms branch of
+## fujinet-lib-experimental (a worktree of it at ~/Workspace/fnlib-sms), so
+## build with
+##   make PLATFORMS=sms sms FUJINET_LIB=$(HOME)/Workspace/fnlib-sms
+## src/sms is guarded by BUILD_SMS the way src/coleco is, and gets the same
+## vars.h quoting hack. The image is a flat 32K: mekkogx/sms-romstamp.py stamps
+## the "FUJI" claim at $7FDC and keeps $7FD8-$7FEF clear for it. The art is the
+## CoCo 3's 16-colour sheet, which src/sms/mktiles.py turns into Mode 4 tiles.
+ifeq ($(PLATFORM),sms)
+  CFLAGS =
+endif
+CFLAGS_EXTRA_SMS = -DBUILD_SMS -DCUSTOM_FUJINET_CALLS -O3
+# 8K of RAM at $C000, stack from $DFF0 down; -m leaves the map beside the
+# image so BSS and the code's end ($7FD8 is the limit) can be read off. No
+# stdio: the game drives the VDP itself (src/sms/graphics.c).
+LDFLAGS_EXTRA_SMS += -m \
+  -pragma-define:CRT_ENABLE_STDIO=0 \
+  -pragma-define:CLIB_FOPEN_MAX=0 \
+  -pragma-define:CLIB_EXIT_STACK_SIZE=0
+
+## Atari 7800 (cc65, FujiNet 7800 cartridge). Not in PLATFORMS: it needs the
+## add-atari7800 branch of fujinet-lib-experimental, the only lib with the
+## atari7800 bus, so build with
+##   make PLATFORMS=atari7800 atari7800 FUJINET_LIB=<that checkout>
+## src/atari7800 is guarded by BUILD_ATARI7800 the way src/nes is. The screen
+## is the shared MARIA engine (src/atari7800/maria.s), its 128 tiles made from
+## the msdos art by src/atari7800/mkchr.py.
+CFLAGS_EXTRA_ATARI7800 = -DBUILD_ATARI7800 -DCUSTOM_FUJINET_CALLS -Os
+
+## Atari 5200 (cc65, FujiNet 5200 cartridge). Not in PLATFORMS: it needs the
+## atari5200 target of fujinet-lib-experimental, the only lib with the
+## atari5200 bus and its crt0, so build with
+##   make PLATFORMS=atari5200 atari5200 FUJINET_LIB=<that checkout>
+## src/atari5200 is guarded by BUILD_ATARI5200 the way src/atari7800 is. The
+## screen is the Atari 8-bit's (src/atari), moved out of the cart window: the
+## top 4K of RAM holds its charset copy, screen and player graphics
+## (src/atari5200/graphics.c), so the C stack sits below $3000.
+CFLAGS_EXTRA_ATARI5200 = -DBUILD_ATARI5200 -DCUSTOM_FUJINET_CALLS -Os
+LDFLAGS_EXTRA_ATARI5200 = --ld-args -D,__RESERVED_MEMORY__=0x1000
 
 ## Coco specific flags (cmoc)
 CFLAGS_EXTRA_COCO = \
@@ -124,6 +209,26 @@ $(PLATFORM)/r2r::
 #	from /support/[platform] without needing to clean.
 	rm -f build/$(PLATFORM)/charset.o
 	rm -f build/$(PLATFORM)/hires.o
+
+#   COLECO ONLY - regenerate the charset from the msdos art
+ifeq ($(PLATFORM),coleco)
+	python3 support/coleco/make_charset.py
+endif
+
+#   NES ONLY - regenerate the pattern table from the msdos art
+ifeq ($(PLATFORM),nes)
+	python3 src/nes/mkchr.py
+endif
+
+#   SMS ONLY - regenerate the Mode 4 tile set from the CoCo 3 art
+ifeq ($(PLATFORM),sms)
+	python3 src/sms/mktiles.py
+endif
+
+#   ATARI 7800 ONLY - regenerate the tile set from the msdos art
+ifeq ($(PLATFORM),atari7800)
+	python3 src/atari7800/mkchr.py
+endif
 
 #   COCO ONLY - copy proper file for Coco1/2 vs Coco3	
 ifeq ($(MAKE_COCO3),COCO3)
@@ -193,7 +298,179 @@ apple2/disk-post::
 	cp support/apple2/bootable.po $(DISK)
 	ac -p "$(DISK)" $(PRODUCT_UPPER).SYSTEM SYS < $(CC65_UTILS_DIR)/$(LOADER_SYSTEM)
 	ac -as "$(DISK)" $(PRODUCT_UPPER) bin <$(EXECUTABLE)
+
+adam/r2r-post::
+#	Stage the DDP on the local TNFS root for loading via the TMA-3 host slot.
+#	Skipped silently inside the defoogi container, where ~/tnfs is not mounted.
+	-@[ -d ~/tnfs ] && cp $(EXECUTABLE) ~/tnfs/ && echo "Copied $(EXECUTABLE) to ~/tnfs/" || true
 	
+
+# ColecoVision: headless smoke test in MAME's coleco driver, against a live
+# fujinet-pc (the cartridge device dials its BoIP listener on 127.0.0.1:9995).
+# MAME resolves rompath, pluginspath and its Lua search path against its OWN
+# working directory, so it is run from the MAME tree and everything handed to
+# it is absolute -- run it from anywhere else and -autoboot_script is ignored
+# silently. That tree needs fujinet-firmware/pico/coleco/emu/apply.sh run
+# against it once for -cartslot fujinet to exist.
+#
+#   make coleco-smoke                          print the screen
+#   make coleco-smoke EXPECT="FUJI BATTLESHIP" and assert on it
+#   make coleco-smoke SCRIPT="fire,fire"       drive the controller first
+#   make coleco-smoke AT=20                    settle longer before sampling
+MAME_DIR    ?= $(HOME)/Workspace/mame
+COLECO_ROM  := $(CURDIR)/r2r/coleco/$(PRODUCT).rom
+AT          ?= 8
+EXPECT      ?=
+SCRIPT      ?=
+# Each scripted press costs a hold plus a gap; 3s of settle before the first.
+SETTLE      ?= 8
+comma       := ,
+SECS        ?= $(shell echo $$(( $(AT) + $(SETTLE) + 4 + 2 * $(words $(subst $(comma), ,$(SCRIPT))) )))
+
+.PHONY: coleco-smoke
+
+coleco-smoke:
+	cd $(MAME_DIR) && \
+	FBS_FONT=$(CURDIR)/src/coleco/font.bin FBS_AT=$(AT) FBS_EXPECT="$(EXPECT)" \
+	FBS_SCRIPT="$(SCRIPT)" FBS_SETTLE=$(SETTLE) FBS_SNAP="$(SNAP)" \
+	./mame coleco -cartslot fujinet -cart $(COLECO_ROM) \
+	    -video none -sound none -nothrottle -seconds_to_run $(SECS) \
+	    -autoboot_script $(CURDIR)/support/coleco/smoke.lua
+
+# NES: headless smoke test in MAME's nes driver, the same shape as
+# coleco-smoke. The MAME tree needs fujinet-firmware/pico/nes/emu/apply.sh run
+# against it once for -nes_slot fujinet to exist. The screen is read out of the
+# nametable through support/nes/tilemap.lua, which mkchr.py writes.
+#
+#   make nes-smoke                           print the screen
+#   make nes-smoke EXPECT="FUJI BATTLESHIP"  and assert on it
+#   make nes-smoke SCRIPT="a,wait5,a"        drive the joypad first
+#                                            (a b select start up down left right waitN)
+#   make nes-play                            play it in a window, with sound
+NES_ROM := $(CURDIR)/r2r/nes/$(PRODUCT).nes
+
+.PHONY: nes-smoke nes-play
+
+nes-smoke:
+	cd $(MAME_DIR) && \
+	FBS_TILEMAP=$(CURDIR)/support/nes/tilemap.lua FBS_AT=$(AT) FBS_EXPECT="$(EXPECT)" \
+	FBS_SCRIPT="$(SCRIPT)" FBS_SETTLE=$(SETTLE) FBS_SNAP="$(SNAP)" \
+	./mame nes -nes_slot fujinet -cart $(NES_ROM) \
+	    -video none -sound none -nothrottle -seconds_to_run $(SECS) \
+	    -autoboot_script $(CURDIR)/support/nes/smoke.lua
+
+nes-play:
+	cd $(MAME_DIR) && ./mame nes -nes_slot fujinet -cart $(NES_ROM) -window
+
+# Sega Master System: headless smoke test in MAME's sms1 driver, the same shape
+# as nes-smoke. The MAME tree needs fujinet-firmware/pico/sms/emu/apply.sh
+# (add-sms branch) run against it once for -slot fujinet to exist. A claimed
+# 32K image is served the way the cartridge serves CONFIG. The screen is read
+# out of the name table through support/sms/tilemap.lua, which mktiles.py
+# writes.
+#
+#   make sms-smoke                           print the screen
+#   make sms-smoke EXPECT="FUJI BATTLESHIP"  and assert on it
+#   make sms-smoke SCRIPT="b1,wait5,pause"   drive the joypad first
+#                                            (b1 b2 pause up down left right,
+#                                             b2+X chords, waitN, snap)
+#   make sms-smoke NOTHROTTLE=               run at real speed, so the server's
+#                                            wall-clock lobby countdown keeps up
+#   SECS counts presses, not waitN steps: pass SECS= for scripts that wait
+#   make sms-play                            play it in a window, with sound
+SMS_ROM := $(CURDIR)/r2r/sms/$(PRODUCT).sms
+NOTHROTTLE ?= -nothrottle
+
+.PHONY: sms-smoke sms-play
+
+sms-smoke:
+	cd $(MAME_DIR) && \
+	FBS_TILEMAP=$(CURDIR)/support/sms/tilemap.lua FBS_AT=$(AT) FBS_EXPECT="$(EXPECT)" \
+	FBS_SCRIPT="$(SCRIPT)" FBS_SETTLE=$(SETTLE) FBS_SNAP="$(SNAP)" \
+	./mame sms1 -slot fujinet -cart $(SMS_ROM) \
+	    -video none -sound none $(NOTHROTTLE) -seconds_to_run $(SECS) \
+	    -autoboot_script $(CURDIR)/support/sms/smoke.lua
+
+sms-play:
+	cd $(MAME_DIR) && ./mame sms1 -slot fujinet -cart $(SMS_ROM) -window
+
+# Atari 7800: headless smoke test in MAME's a7800 driver, the same shape as
+# nes-smoke. The MAME tree (a single-driver a7800 build) needs
+# fujinet-firmware/pico/atari-7800/emu/apply.sh run against it once for
+# -cartslot fujinet to exist; the cartridge dials fujinet-pc's BoIP at
+# FUJINET_TCP (default 127.0.0.1:9995). The screen is read out of the MARIA
+# engine's map through support/atari7800/tilemap.lua, which mkchr.py writes.
+#
+#   make atari7800-smoke                           print the screen
+#   make atari7800-smoke EXPECT="FUJI BATTLESHIP"  and assert on it
+#   make atari7800-smoke SCRIPT="until:ai_-_1_on_1,down,fire"
+#                                  drive the joystick first (the steps are in
+#                                  support/atari7800/smoke.lua's header)
+#   make atari7800-smoke A7800_SYSTEM=a7800p       on a PAL console
+#   make atari7800-play                            play it in a window, with sound
+A7800_MAME_DIR ?= $(HOME)/Workspace/mame-a7800
+A7800_MAME     ?= ./a7800
+A7800_SYSTEM   ?= a7800
+A7800_ROMS     ?= $(HOME)/Workspace/mame/roms
+A7800_SECS     ?= 600
+A7800_A78      := $(CURDIR)/r2r/atari7800/$(PRODUCT).a78
+A7800_OUT      := $(CURDIR)/build/atari7800/mame
+A7800_ARGS      = $(A7800_SYSTEM) -rompath $(A7800_ROMS) -cartslot fujinet -cart $(A7800_A78) \
+	-snapshot_directory $(A7800_OUT)/snap -nvram_directory $(A7800_OUT)/nvram \
+	-cfg_directory $(A7800_OUT)/cfg
+
+.PHONY: atari7800-smoke atari7800-play
+
+atari7800-smoke:
+	mkdir -p $(A7800_OUT)/snap $(A7800_OUT)/nvram $(A7800_OUT)/cfg
+	cd $(A7800_MAME_DIR) && \
+	FBS_TILEMAP=$(CURDIR)/support/atari7800/tilemap.lua \
+	FBS_MAPFILE=$(CURDIR)/r2r/atari7800/$(PRODUCT).map FBS_AT=$(AT) \
+	FBS_EXPECT="$(EXPECT)" FBS_SCRIPT="$(SCRIPT)" FBS_SETTLE=$(SETTLE) FBS_SNAP="$(SNAP)" \
+	$(A7800_MAME) $(A7800_ARGS) -video none -sound none -nothrottle \
+	    -seconds_to_run $(A7800_SECS) -autoboot_script $(CURDIR)/support/atari7800/smoke.lua
+
+atari7800-play:
+	mkdir -p $(A7800_OUT)/snap $(A7800_OUT)/nvram $(A7800_OUT)/cfg
+	cd $(A7800_MAME_DIR) && $(A7800_MAME) $(A7800_ARGS) -window -nomax
+
+# Atari 5200: headless smoke test in MAME's a5200 driver, the same shape as
+# atari7800-smoke. The MAME tree (a single-driver a5200 build) needs
+# fujinet-firmware/pico/atari-5200/emu/apply.sh run against it once for
+# -cartslot fujinet to exist; the cartridge dials fujinet-pc's BoIP at
+# FUJINET_TCP (default 127.0.0.1:9995). The screen is read straight out of
+# RAM ($3400) through support/atari/charset.fnt's codes.
+#
+#   make atari5200-smoke                           print the screen
+#   make atari5200-smoke EXPECT="FUJI BATTLESHIP"  and assert on it
+#   make atari5200-smoke SCRIPT="until:ai_-_1_on_1,down,fire"
+#                                  drive the controller first (the steps are
+#                                  in support/atari5200/smoke.lua's header)
+#   make atari5200-play                            play it in a window, with sound
+A5200_MAME_DIR ?= $(HOME)/Workspace/mame-a5200
+A5200_MAME     ?= ./a5200
+A5200_SYSTEM   ?= a5200
+A5200_ROMS     ?= $(HOME)/Workspace/mame/roms
+A5200_SECS     ?= 600
+A5200_BIN      := $(CURDIR)/r2r/atari5200/$(PRODUCT).bin
+A5200_OUT      := $(CURDIR)/build/atari5200/mame
+A5200_ARGS      = $(A5200_SYSTEM) -rompath $(A5200_ROMS) -skip_gameinfo -cartslot fujinet \
+	-cart $(A5200_BIN) -snapshot_directory $(A5200_OUT)/snap \
+	-nvram_directory $(A5200_OUT)/nvram -cfg_directory $(A5200_OUT)/cfg
+
+.PHONY: atari5200-smoke atari5200-play
+
+atari5200-smoke:
+	mkdir -p $(A5200_OUT)/snap $(A5200_OUT)/nvram $(A5200_OUT)/cfg
+	cd $(A5200_MAME_DIR) && \
+	FBS_AT=$(AT) FBS_EXPECT="$(EXPECT)" FBS_SCRIPT="$(SCRIPT)" FBS_SETTLE=$(SETTLE) \
+	FBS_SNAP="$(SNAP)" \
+	$(A5200_MAME) $(A5200_ARGS) -video none -sound none -nothrottle \
+	    -seconds_to_run $(A5200_SECS) -autoboot_script $(CURDIR)/support/atari5200/smoke.lua
+
+atari5200-play:
+	mkdir -p $(A5200_OUT)/snap $(A5200_OUT)/nvram $(A5200_OUT)/cfg
+	cd $(A5200_MAME_DIR) && $(A5200_MAME) $(A5200_ARGS) -window -nomax
 
 # Reset FujiNet-PC
 reset-fn:

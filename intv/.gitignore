@@ -1,0 +1,6 @@
+# Build outputs from `make` in this directory (see Makefile).
+battleship.asm
+battleship.bin
+battleship.cfg
+battleship.rom
+battleship.lst

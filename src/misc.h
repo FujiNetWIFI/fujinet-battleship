@@ -125,7 +125,36 @@ typedef union
     Tables tables;
 } ClientState;
 
+#ifdef BUILD_COLECO
+/*
+  The ColecoVision has 1K of RAM and this union is 509 bytes of it, so the
+  state is never copied down: it is read in place out of the FujiNet
+  cartridge's reply window, which is what that window is 1K and addressable
+  for. See src/coleco/vars.h and src/coleco/fujinet.c.
+
+  It is therefore READ-ONLY -- a store here goes nowhere, the cartridge cannot
+  even see a write cycle -- and it is valid only until the next fuji_* call of
+  any kind, because every transaction repaints the window.
+*/
+#define clientState (*(ClientState *) COLECO_REPLY_WINDOW)
+#else
 extern ClientState clientState;
+#endif
+
+/*
+  The gamefield shadow only ever answers "was this cell empty before" (the
+  shoot animation trigger), so on the RAM-starved ColecoVision it is packed to
+  one bit per cell - 13 bytes per player instead of 100. Everywhere else it
+  stays byte-per-cell. gamelogic.c's packGamefield() fills it and
+  GAMEFIELD_IS_EMPTY() is the only reader.
+*/
+#ifdef BUILD_COLECO
+#define GAMEFIELD_BYTES 13
+#define GAMEFIELD_IS_EMPTY(p, pos) (!(state.gamefield[p][(pos) >> 3] & (1 << ((pos)&7))))
+#else
+#define GAMEFIELD_BYTES 100
+#define GAMEFIELD_IS_EMPTY(p, pos) (state.gamefield[p][pos] == 0)
+#endif
 
 typedef struct
 {
@@ -145,7 +174,7 @@ typedef struct
     bool inGame;
 
     // Track gamefield state - used to know when to fire shoot animation
-    uint8_t gamefield[PLAYER_MAX][100];
+    uint8_t gamefield[PLAYER_MAX][GAMEFIELD_BYTES];
 
     // Track ships left - used to know when to fire sink animation
     uint8_t shipsLeft[PLAYER_MAX][5];
@@ -168,12 +197,37 @@ typedef struct
     uint8_t reserved[20]; // Reserve blank space for future
 } PrefsStruct;
 
-extern char tempBuffer[128];
+/*
+  Scratch buffer sizes. The ColecoVision has 1K of RAM in total, so these are
+  cut to what each one actually has to hold rather than to a round number.
+  On the ColecoVision tempBuffer also doubles as stateclient.c's url build
+  buffer, so its floor is the full url: "n:" + endpoint(49) + the longest path
+  ("place/199,..." = 25) + query(35) + "&bin=1&v=2" = 122 (which also covers
+  its other floors, the 100-cell ship-placement occupancy map and
+  MAX_APPKEY_LEN+1). query is "?table=" + 8 + "&player=" + 11.
+*/
+#ifdef BUILD_COLECO
+#define TEMP_BUFFER_LEN 124
+#define QUERY_LEN 36
+#define URL_BUFFER_LEN 124
+#else
+#define TEMP_BUFFER_LEN 128
+#define QUERY_LEN 50
+#define URL_BUFFER_LEN 160
+#endif
+
+extern char tempBuffer[TEMP_BUFFER_LEN];
 extern char serverEndpoint[50];
-extern char localServer[];
-extern char query[50];
+extern const char localServer[];
+extern char query[QUERY_LEN];
 extern char playerName[12];
-extern uint8_t shipSize[5];
+extern const uint8_t shipSize[5];
+
+#ifdef USE_PLATFORM_NAME_ENTRY
+// Keyboard-less platforms implement name entry themselves (e.g. the
+// ColecoVision on-screen keyboard in src/coleco/osk.c)
+void platformNameEntry(uint8_t x, uint8_t y, uint8_t max, char *buffer);
+#endif
 
 extern GameState state;
 extern InputStruct input;

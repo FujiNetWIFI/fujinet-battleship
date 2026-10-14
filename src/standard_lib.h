@@ -26,6 +26,39 @@ unsigned char kbhit (void);
  */
 char cgetc (void);
 
+#elif defined(__ADAM__)
+// z88dk's conio.h maps cgetc() onto getk(), which is a dead stub on the
+// Adam target - kbhit/cgetc are implemented over EOS in src/adam/input.c
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+/* (Non blocking) Return non-zero if a key is waiting. */
+unsigned char kbhit (void);
+
+/* (Blocking) Return a character from the keyboard.
+ * Must be unsigned: sccz80 chars are signed, and the Adam's arrow/smart
+ * keys are 0x81-0xA8 - a plain char return would sign-extend them and no
+ * KEY_* case in the input switch would ever match. */
+unsigned char cgetc (void);
+
+#elif defined(BUILD_COLECO) || defined(BUILD_NES) || defined(BUILD_SMS) || defined(BUILD_ATARI7800) || defined(BUILD_ATARI5200)
+// No keyboard at all: src/coleco/input.c synthesizes key codes from the
+// twelve-key keypad and the second fire button, src/nes/input.c and
+// src/sms/input.c from the joypad's buttons, src/atari7800/input.c from the
+// joystick's buttons and the console switches, src/atari5200/input.c from
+// the fire buttons and the keypad. unsigned for the same sign-extension
+// reason as the Adam above.
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+/* (Non blocking) Return non-zero if a synthesized key is waiting. */
+unsigned char kbhit (void);
+
+/* (Blocking) Return a synthesized key code. */
+unsigned char cgetc (void);
+
 #else
 // Standard libraries
 #include <conio.h>
