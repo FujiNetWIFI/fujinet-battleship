@@ -131,6 +131,17 @@ LDFLAGS_EXTRA_SMS += -m \
 ## the msdos art by src/atari7800/mkchr.py.
 CFLAGS_EXTRA_ATARI7800 = -DBUILD_ATARI7800 -DCUSTOM_FUJINET_CALLS -Os
 
+## Atari 5200 (cc65, FujiNet 5200 cartridge). Not in PLATFORMS: it needs the
+## atari5200 target of fujinet-lib-experimental, the only lib with the
+## atari5200 bus and its crt0, so build with
+##   make PLATFORMS=atari5200 atari5200 FUJINET_LIB=<that checkout>
+## src/atari5200 is guarded by BUILD_ATARI5200 the way src/atari7800 is. The
+## screen is the Atari 8-bit's (src/atari), moved out of the cart window: the
+## top 4K of RAM holds its charset copy, screen and player graphics
+## (src/atari5200/graphics.c), so the C stack sits below $3000.
+CFLAGS_EXTRA_ATARI5200 = -DBUILD_ATARI5200 -DCUSTOM_FUJINET_CALLS -Os
+LDFLAGS_EXTRA_ATARI5200 = --ld-args -D,__RESERVED_MEMORY__=0x1000
+
 ## Coco specific flags (cmoc)
 CFLAGS_EXTRA_COCO = \
 	-Wno-assign-in-condition \
@@ -409,6 +420,44 @@ atari7800-smoke:
 atari7800-play:
 	mkdir -p $(A7800_OUT)/snap $(A7800_OUT)/nvram $(A7800_OUT)/cfg
 	cd $(A7800_MAME_DIR) && $(A7800_MAME) $(A7800_ARGS) -window -nomax
+
+# Atari 5200: headless smoke test in MAME's a5200 driver, the same shape as
+# atari7800-smoke. The MAME tree (a single-driver a5200 build) needs
+# fujinet-firmware/pico/atari-5200/emu/apply.sh run against it once for
+# -cartslot fujinet to exist; the cartridge dials fujinet-pc's BoIP at
+# FUJINET_TCP (default 127.0.0.1:9995). The screen is read straight out of
+# RAM ($3400) through support/atari/charset.fnt's codes.
+#
+#   make atari5200-smoke                           print the screen
+#   make atari5200-smoke EXPECT="FUJI BATTLESHIP"  and assert on it
+#   make atari5200-smoke SCRIPT="until:ai_-_1_on_1,down,fire"
+#                                  drive the controller first (the steps are
+#                                  in support/atari5200/smoke.lua's header)
+#   make atari5200-play                            play it in a window, with sound
+A5200_MAME_DIR ?= $(HOME)/Workspace/mame-a5200
+A5200_MAME     ?= ./a5200
+A5200_SYSTEM   ?= a5200
+A5200_ROMS     ?= $(HOME)/Workspace/mame/roms
+A5200_SECS     ?= 600
+A5200_BIN      := $(CURDIR)/r2r/atari5200/$(PRODUCT).bin
+A5200_OUT      := $(CURDIR)/build/atari5200/mame
+A5200_ARGS      = $(A5200_SYSTEM) -rompath $(A5200_ROMS) -skip_gameinfo -cartslot fujinet \
+	-cart $(A5200_BIN) -snapshot_directory $(A5200_OUT)/snap \
+	-nvram_directory $(A5200_OUT)/nvram -cfg_directory $(A5200_OUT)/cfg
+
+.PHONY: atari5200-smoke atari5200-play
+
+atari5200-smoke:
+	mkdir -p $(A5200_OUT)/snap $(A5200_OUT)/nvram $(A5200_OUT)/cfg
+	cd $(A5200_MAME_DIR) && \
+	FBS_AT=$(AT) FBS_EXPECT="$(EXPECT)" FBS_SCRIPT="$(SCRIPT)" FBS_SETTLE=$(SETTLE) \
+	FBS_SNAP="$(SNAP)" \
+	$(A5200_MAME) $(A5200_ARGS) -video none -sound none -nothrottle \
+	    -seconds_to_run $(A5200_SECS) -autoboot_script $(CURDIR)/support/atari5200/smoke.lua
+
+atari5200-play:
+	mkdir -p $(A5200_OUT)/snap $(A5200_OUT)/nvram $(A5200_OUT)/cfg
+	cd $(A5200_MAME_DIR) && $(A5200_MAME) $(A5200_ARGS) -window -nomax
 
 # Reset FujiNet-PC
 reset-fn:
