@@ -45,7 +45,7 @@ typedef struct {
   appkeyblock payload; // The appkey (see appkey.h)
 } appkeyC64;
 
-appkeyC64 appkey;
+static appkeyC64 appkey;
 
 
 #define N_LFN 2     // Network

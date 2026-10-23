@@ -7,7 +7,12 @@
 
 #include "misc.h"
 #include "stateclient.h"
+#ifdef __C64__
+// fujinet-lib 5's own header (see Makefile)
+#include <fujinet-network.h>
+#else
 #include "fujinet-network.h"
+#endif
 
 // Internal to this file
 #ifdef BUILD_COLECO

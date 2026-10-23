@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <time.h>
-#include "../fujinet-fuji.h"
+#include <fujinet-fuji.h>
 #include "../platform-specific/graphics.h"
 
 // C64 timer location - CIA1 timer A
