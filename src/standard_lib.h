@@ -12,7 +12,12 @@
  */
 
 // Include FujiNet Fuji header, which sets std int and bool types (uint8_t, bool, etc)
+#ifdef __C64__
+// fujinet-lib 5's own header (see Makefile)
+#include <fujinet-fuji.h>
+#else
 #include "fujinet-fuji.h"
+#endif
 
 #ifdef _CMOC_VERSION_
 #include <coco.h>

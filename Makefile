@@ -67,6 +67,12 @@ ifeq ($(PLATFORM),adam)
 endif
 LDFLAGS_EXTRA_ADAM = -m
 
+## C64 - fujinet-lib 5 speaks the current IEC protocol (FujiIECPacket, unified N:).
+## Its API differs from the 4.x headers in src, so the C64 includes the lib's own.
+ifeq ($(PLATFORM),c64)
+  FUJINET_LIB = 5.0.0
+endif
+
 ## ColecoVision (z88dk +coleco, FujiNet mailbox cartridge). Not in PLATFORMS:
 ## it needs fujinet-lib-experimental (the only lib with the coleco bus), so
 ## build with either
