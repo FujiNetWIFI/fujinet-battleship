@@ -32,4 +32,6 @@
     include "p5.inc"
     elseif PAGE=6
     include "p6.inc"
+    elseif PAGE=7
+    include "p7.inc"
     endif

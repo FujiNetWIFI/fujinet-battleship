@@ -56,6 +56,10 @@ G_DASH  equ 40
 G_TIMES equ 41
 G_BLOCK equ 47
 G_BALL  equ 49
+CH_BALL  equ 00h                ; the pictures' codes in text (mkcharmap.py)
+CH_BLOCK equ 08h
+CH_ARROW equ 0Ah
+CH_TIMES equ 10h
 
 ; Character colours, as MAME's i8244 draws them (control byte bits 1-3)
 C_DGREY  equ 0
@@ -140,3 +144,73 @@ SND_LOSE   equ 8
 SND_SOFT   equ 9
 SND_TICK   equ 9
 SND_MOVE   equ 10
+
+; ---- requests (net.inc): ACT_*, and what a request came to (NETHAVE) ----
+ACT_STATE  equ 1
+ACT_READY1 equ 2
+ACT_READY0 equ 3
+ACT_PLACE  equ 4                ; FLEET
+ACT_ATTACK equ 5                ; arg: the cell
+ACT_LEAVE  equ 6
+ACT_TABLS  equ 7                ; tables?bin=1
+
+NS_IDLE equ 0
+NS_CLOS equ 1
+NS_OPEN equ 2
+NS_STAT equ 3
+NS_READ equ 4
+
+NH_FAIL   equ 0
+NH_STATE  equ 1                 ; a whole state is in the reply
+NH_TABLES equ 2                 ; the table list
+
+; ---- the battle's boards (p5.inc VIEW) and scratch (XRAM, SCR0 beyond a
+; row's ten cells) ----
+V_FLEET  equ 0                  ; ours; 1-3 an opponent's
+V_TARGET equ 4
+ROWN    equ SCR0+11             ; the row being built
+SHIPJ   equ SCR0+12             ; mark_ships's ship
+NLIVE   equ SCR0+13             ; live opponents (the target's rows)
+SEATK   equ SCR0+14             ; the seat a loop is on
+
+; ---- page 1's farcall entries ----
+PG_NET   equ 1
+E_NBEGIN equ 0
+E_NSTEP  equ 1
+
+; ---- the server's binary state, v=2 (src/misc.h, fujinet-game-system
+; battleship util.go): strings lowercased, NUL-padded to max+1 ----
+ST_COUNT  equ 0                 ; playerCount
+ST_PROMPT equ 1                 ; 33: prompt
+ST_STATUS equ 34
+ST_PSTAT  equ 35                ; our playerStatus
+ST_ACTIVE equ 36                ; activePlayer, us = 0 (0FFh nobody; the winner at 99)
+ST_MOVET  equ 37                ; moveTime, seconds
+ST_LSERVER equ 38               ; the lobby: serverName (21) ...
+ST_LSEATS equ 59                ; ... and its seats, SEAT_LOBBY each
+ST_LASTAT equ 38                ; placement, play, game over: lastAttackPos
+ST_SHIPS  equ 39                ; 10: ours (0-4) and, at 99, the winner's (5-9)
+ST_SEATS  equ 49                ; the seats: SEAT_PLAY each (SEAT_LOBBY placing)
+SEAT_LOBBY equ 10               ; name (9), status
+SEAT_PLAY equ 115               ; name (9), status, field (100), ships left (5)
+SE_STATUS equ 9
+SE_FIELD  equ 10
+SE_LEFT   equ 110
+TB_SIZE   equ 36                ; a table: id (9), name (21), players (6)
+TB_NAME   equ 9
+TB_PLAYERS equ 30
+
+STATUS_LOBBY equ 0
+STATUS_PLACE equ 1
+STATUS_START equ 10
+STATUS_MISS  equ 11
+STATUS_HIT   equ 12
+STATUS_SUNK  equ 13
+STATUS_OVER  equ 99
+PS_PLAYING equ 0                ; playerStatus (in the lobby: not ready)
+PS_DEFEAT  equ 1
+PS_VIEWING equ 2
+PS_READY   equ 3
+PS_PLACE   equ 10
+F_HIT   equ 1                   ; a field's cell
+F_MISS  equ 2

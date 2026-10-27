@@ -16,7 +16,7 @@ ASL="${ASL:-$HOME/asl/asl}"
 P2BIN="${P2BIN:-$HOME/asl/p2bin}"
 SPIKE="${SPIKE:-0}"
 AUTOPLAY="${AUTOPLAY:-0}"
-if [ "$SPIKE" = 1 ]; then NPAGES=2; else NPAGES=7; fi
+if [ "$SPIKE" = 1 ]; then NPAGES=2; else NPAGES="${NPAGES:-8}"; fi
 mkdir -p "$OUT"
 
 python3 "$HERE/tools/checkflags.py" "$HERE"/src/*.inc

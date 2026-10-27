@@ -14,6 +14,7 @@ CL_PLACE equ 5                  ; the ship being placed
 CL_BAD   equ 6                  ; ... where it may not go
 CL_PART  equ 7                  ; some of them have it marked (the target)
 CL_SUNK  equ 8                  ; a ship of the winner's, shown at the end
+CL_SEA   equ 9                  ; 9-12: water on seat 0-3's board, in its colour
 
 ; scr_board: the board screen -- every cell water, T0 and T1 blank, the
 ; sprites hidden. Rows first, then the band list: a frame between them
@@ -129,6 +130,7 @@ cp_nb:
     mov r1,a
     ret
 
+    ifdef CURSOR
 ; spr_cursor: sprite 0 over cell (r3 = column, r4 = row), or hidden when r2
 ; is 0. Clobbers A, r0-r2, r5, r6.
 spr_cursor:
@@ -158,6 +160,7 @@ scu_put:
     call poke_b
     mov a,#C_TAN<<3
     jmp poke_b
+    endif
 
 ; The rows' Y.
 rowy:
@@ -170,5 +173,7 @@ Y_ROWK  set Y_ROWK+PITCH
 ; A cell code's glyph and colour.
 cellg:
     db G_DASH, G_BLOCK, G_BLOCK, G_DOT, G_BALL, G_BLOCK, G_BLOCK, G_DOT, G_BLOCK
+    db G_DASH, G_DASH, G_DASH, G_DASH
 cellc:
-    db C_BLUE, C_WHITE, C_RED, C_WHITE, C_RED, C_GREEN, C_VIOLET, C_CYAN, C_TAN
+    db C_BLUE, C_WHITE, C_RED, C_WHITE, C_RED, C_GREEN, C_VIOLET, C_DGREY, C_WHITE
+    db C_CYAN, C_GREEN, C_TAN, C_VIOLET

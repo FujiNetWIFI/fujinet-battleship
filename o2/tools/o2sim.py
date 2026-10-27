@@ -24,6 +24,8 @@ steps, one per line (# comments):
     iram ADDR [LEN]     print the 8048's internal RAM
     cart ADDR [LEN]     print the cart's program space ($400-$FFF)
     until XRAM V [N]    wait (at most N frames) until external RAM XRAM == V
+    tap XRAM [LEN]      from here on, print each write to external RAM
+                        XRAM..XRAM+LEN-1: TAP frame addr value
     pc                  print the PC, PSW and A
 
 O2SIM_SHOTS=N: a snapshot every N frames, shot_<frame> (for picking screenshots).
@@ -151,9 +153,18 @@ local function step()
     elseif s[1] == "burstkey" then
       keyheld = {s[4], s[5]}; setkey(s[4], s[5], 1)
       burstname = s[2]; burstk = 0; burstleft = s[3]; return
+    elseif s[1] == "tap" then
+      local io = cpu.spaces["io"]
+      local lo, hi = s[2], s[2] + s[3] - 1
+      _G._o2taps = _G._o2taps or {}           -- each kept, or it's collected
+      _G._o2taps[#_G._o2taps + 1] = io:install_write_tap(lo, hi, "o2tap" .. lo, function(offset, data, mask)
+        if (cpu.state["P1"].value & 0x10) == 0 then
+          print(string.format("TAP %%d %%02X %%02X", frames, offset, data))
+        end
+      end)
     elseif s[1] == "watch" then watchaddr = s[2]; watchleft = s[3]; watchlen = s[4]; watchlast = ""; return
     elseif s[1] == "pc" then
-      print(string.format("PC %%03X SP %%d A %%02X P1 %%02X TC %%02X", cpu.state["PC"].value, cpu.state["SP"].value, cpu.state["A"].value, cpu.state["P1"].value, cpu.state["TC"].value))
+      print(string.format("PC %%03X SP %%d A %%02X P1 %%02X P2 %%02X TC %%02X", cpu.state["PC"].value, cpu.state["SP"].value, cpu.state["A"].value, cpu.state["P1"].value, cpu.state["P2"].value, cpu.state["TC"].value))
     else dump(s[1], s[2], s[3]) end
   end
   if i > #steps then
@@ -200,6 +211,8 @@ def parse(path):
             steps.append('{"burstkey","%s",%d,%d,%d}' % (w[1], int(w[2]), code >> 3, 1 << (code & 7)))
         elif w[0] == "burst":
             steps.append('{"burst","%s",%d}' % (w[1], int(w[2])))
+        elif w[0] == "tap":
+            steps.append('{"tap",%d,%d}' % (int(w[1], 16), int(w[2]) if len(w) > 2 else 1))
         elif w[0] == "watch":
             steps.append('{"watch",%d,%d,%d}' % (int(w[1], 16), int(w[2]), int(w[3]) if len(w) > 3 else 1))
         elif w[0] == "pc":
@@ -233,7 +246,11 @@ def main(scen, out, image=None):
            "-snapshot_directory", snapdir,
            "-cfg_directory", os.path.join(out, "cfg"),
            "-nvram_directory", os.path.join(out, "nvram"),
-           "-autoboot_script", luafile, "-skip_gameinfo"]
+           "-autoboot_script", luafile, "-skip_gameinfo",
+           # the host's own keyboard and joysticks out: a gamepad on this
+           # machine read as the stick held LEFT, mid-scenario
+           "-keyboardprovider", "none", "-joystickprovider", "none",
+           "-mouseprovider", "none", "-lightgunprovider", "none"]
     if os.environ.get("O2SIM_WAV"):
         cmd += ["-wavwrite", os.path.abspath(os.environ["O2SIM_WAV"])]
     if not live:
@@ -242,7 +259,7 @@ def main(scen, out, image=None):
     if os.environ.get("O2SIM_VERBOSE"):
         print(r.stdout, r.stderr)
     for line in (r.stdout + r.stderr).splitlines():
-        if line.startswith(("PEEK", "UNTIL", "O2SIM", "PC ", "WATCH", "AUTO", "fujinet:")):
+        if line.startswith(("PEEK", "UNTIL", "O2SIM", "PC ", "WATCH", "TAP", "fujinet:")):
             print(line)
     names = []
     if os.path.exists(os.path.join(out, "snaps.txt")):

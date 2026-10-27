@@ -128,8 +128,13 @@ txb_seat:
     add a,#fieldcol&0FFh
     movp a,@a
     jmp txb_put
-fieldcol:
-    db C_RED, C_GREEN, C_TAN, C_VIOLET
+; seat_col: A = seat A's colour.
+seat_col:
+    add a,#fieldcol&0FFh
+    movp a,@a
+    ret
+fieldcol:                       ; the seats' colours: us, then the others
+    db C_CYAN, C_GREEN, C_TAN, C_VIOLET
 
 ; lb_clear: LINEBUF to spaces. Clobbers A, r0, r2.
 lb_clear:

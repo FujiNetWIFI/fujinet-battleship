@@ -214,8 +214,10 @@ os_x:
 
 ; txt_write: the 16-character line whose table is at r1 in this page, into
 ; the four quads interleaved: A takes columns 0, 2, 4, 6, B 1, 3, 5, 7, C and
-; D the next eight (disp.inc txorder). VDC selected, foreground off. About
-; 360 cycles. Clobbers A, r0-r4.
+; D the next eight (disp.inc txorder). Jumped to, not called, to keep the
+; interrupts one call deep: it leaves to vb_t0 when F0 is set (the vblank's
+; T0), else through band_out. VDC selected, foreground off. About 360
+; cycles. Clobbers A, r0-r4.
 txt_write:
     mov a,r1
     movp a,@a
@@ -232,6 +234,11 @@ txt_write:
     call tq
     mov r0,#vdc_quad3
     mov r3,#X_TEXT+72
+    call tq
+    jf0 tw_vbl
+    jmp band_out
+tw_vbl:
+    jmp vb_t0
 tq:
     mov a,r4                    ; Y and X are mirrored across a quad
     movx @r0,a
@@ -334,8 +341,8 @@ NBANDS  equ 11
 ; vbl_isr: once a frame, in the blank. Arms the first band -- exact anywhere
 ; in the blank, because the counter only counts display lines (T1 is
 ; vblank|hblank) -- then the sprites, T0 and, on a board screen, row 0
-; staged for the first band. The interrupt nests two calls deep, so the main
-; program may nest five.
+; staged for the first band. The interrupts nest one call deep, so the main
+; program may nest six.
 vbl_isr:
     ISR_IN
     ISR_VDC
@@ -359,7 +366,10 @@ vb_q:
     movx @r0,a
     call spr_write
     mov r1,#T0&0FFh
-    call txt_write
+    clr f0                      ; (RETR gives the main program its F0 back)
+    cpl f0
+    jmp txt_write
+vb_t0:
     mov r1,#MODE
     mov a,@r1
     jb1 vb_setup
@@ -443,7 +453,9 @@ h_txt:
     ISR_OFF
     mov a,r3
     mov r1,a
-    call txt_write
+    clr f0
+    jmp txt_write
+band_out:                       ; where the text writer leaves
     ISR_ON
     ISR_OUT
 

@@ -84,3 +84,5 @@ SHOTP   equ 05Dh                ; the cell we fired at
 LIVE    equ 05Eh                ; bit n: seat n is alive (not defeated)
 AUTO    equ 05Fh                ; AUTOPLAY builds: the next cell to try
 SCR0    equ 060h                ; scratch, 16 bytes: per-routine
+OCC     equ 070h                ; 13: placement's cells taken, a bit each
+TMP2    equ 07Fh

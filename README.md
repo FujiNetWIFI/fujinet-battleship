@@ -13,6 +13,7 @@ This is a WIP cross platform game client for the Fuji Battleships server.
 * **Sega Master System** (FujiNet SMS cartridge)
 * **Atari 7800** (FujiNet 7800 cartridge)
 * **Atari 5200** (FujiNet 5200 cartridge)
+* **Odyssey 2 / Videopac** (FujiNet O2 cartridge): see [o2/README.md](o2/README.md)
 * *Please contribute to add more!*
 
 ### To Build
