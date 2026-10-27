@@ -52,11 +52,15 @@ def main():
     ap.add_argument("--leave-after", type=int, default=-1)
     ap.add_argument("--games", type=int, default=1)
     a = ap.parse_args()
-    shots, slept, games, seen, turn_at = 0, 0, 0, None, None
+    shots, slept, games, seen, turn_at, sleeping = 0, 0, 0, None, None, False
     while True:
         s = parse(get(a.server, "state", a.table, a.name))
         key = (s["status"], s["active"], s["pstat"])
         if key != seen:
+            if sleeping and s["active"] != 0:
+                slept += 1                  # the turn went by: the server skipped it
+                sleeping = False
+                print("PLAYER slept through a turn", flush=True)
             print("PLAYER status %d pstat %d active %d movet %d seats %s %r" % (
                 s["status"], s["pstat"], s["active"], s["movet"],
                 ",".join("%s:%d" % (x["name"], x.get("left", x["status"])) for x in s["seats"]),
@@ -68,8 +72,7 @@ def main():
             get(a.server, "place/0,10,20,30,40", a.table, a.name)
         elif s["status"] in (10, 11, 12, 13) and s["active"] == 0 and s["pstat"] == 0:
             if slept < a.sleep_turns:
-                if time.time() - turn_at > s["movet"] + 2:
-                    slept += 1
+                sleeping = True
             elif time.time() - turn_at >= a.delay:
                 live = [x for x in s["seats"][1:] if x["status"] != 1]
                 cell = next(p for p in range(100) if any(x["field"][p] == 0 for x in live))

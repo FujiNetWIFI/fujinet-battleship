@@ -18,7 +18,7 @@ Only tested in MAME (`-cartslot fujinet`), never on a real console.
 |---|---|---|---|
 | Name (first run) | | | letters, digits, space; CLR rubs out, ENT ends |
 | Tables | up/down | join | |
-| Lobby | | ready / not ready | |
+| Lobby | | ready, or cancel it | |
 | Placing | moves the ship | keeps it | R turns it, Z places the rest |
 | Battle | moves the cursor | fires | 0 your fleet, 1-3 an opponent, T the target |
 | Anywhere at a table | | | L leaves it |
@@ -126,6 +126,23 @@ scenario:
 
 An `AUTOPLAY=1` build readies itself, places its fleet at random and fires
 at the first cell it may.
+
+What has run, all in MAME against the private server:
+
+- **Boot:** keyboard name entry, the table list, join, and L to leave.
+- **Placing:** moving, turning and keeping a ship, then Z for the rest.
+- **The views:** target, fleet and opponent.
+- **AI-3:** a self-playing game to game over and back to the lobby, 457
+  requests, all 200.
+- **Two humans:** a game against `test/player.py` on Cape Fuji, through the
+  ready handshake and game over, 787 requests, all 200.
+- **Bands:** `rowcheck` found no lost lines while the network and redraws
+  ran.
+- **Sounds:** checked with `O2SIM_WAV` and `tools/sndcheck.py`.
+
+`tools/o2sim.py` runs MAME with the host's keyboard, joysticks and mouse
+turned off. A gamepad on the test machine otherwise read as the O2's stick
+held LEFT, which showed up as lost and doubled presses.
 
 ## Not done
 

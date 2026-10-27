@@ -157,8 +157,8 @@ lt_x:
     org 0A00h
     include "text.inc"
 
-s_ready:   db " FIRE: READY",0
-s_unready: db " FIRE: NOT READY",0
+s_ready:   db " FIRE TO READY",0
+s_unready: db " FIRE TO CANCEL",0
 s_rdy:     db "READY",0
 
     if $ > 0B00h
