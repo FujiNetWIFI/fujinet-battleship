@@ -61,6 +61,11 @@ pv_state:
     mov r0,#AUTO
     movx @r0,a
 pv_old:
+    mov r0,#REDRAW              ; back from the help screen
+    movx a,@r0
+    jz pv_sig
+    call pv_back
+pv_sig:
     mov r0,#STAT                ; anything new: a shot, the turn passed
     movx a,@r0
     mov r2,a
@@ -185,26 +190,6 @@ cu_keep:
     mov a,#0FFh
     movx @r0,a
 cu_x:
-    ret
-
-; mark_ships: our five ships (FLEET) onto SCR0 where they cross row ROWN.
-; Clobbers A, r0-r7.
-mark_ships:
-    clr a
-ms_l:
-    mov r0,#SHIPJ
-    movx @r0,a
-    call ship_dec
-    mov r7,#CL_SHIP
-    call mark_row
-    mov r0,#SHIPJ
-    movx a,@r0
-    inc a
-    xrl a,#5
-    jz ms_x
-    xrl a,#5
-    jmp ms_l
-ms_x:
     ret
 
     if $ > 900h
@@ -842,6 +827,36 @@ mr_v:
     mov a,r7
     movx @r0,a
     ret
+
+; mark_ships: our five ships (FLEET) onto SCR0 where they cross row ROWN.
+; Clobbers A, r0-r7.
+mark_ships:
+    clr a
+ms_l:
+    mov r0,#SHIPJ
+    movx @r0,a
+    call ship_dec
+    mov r7,#CL_SHIP
+    call mark_row
+    mov r0,#SHIPJ
+    movx a,@r0
+    inc a
+    xrl a,#5
+    jz ms_x
+    xrl a,#5
+    jmp ms_l
+ms_x:
+    ret
+
+; pv_back: the board screen back from the help screen: its bands, T0 and
+; T1 (the rows were never touched). Clobbers A, r0-r7.
+pv_back:
+    call bands_board
+    mov r1,#MODE
+    mov a,#MODE_BOARD|MODE_SETUP
+    mov @r1,a
+    call t1_seats
+    jmp t0_turn
 
     if $ > 0F00h
     error "page $E has run out"

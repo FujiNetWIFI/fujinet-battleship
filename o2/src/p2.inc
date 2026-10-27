@@ -31,17 +31,45 @@ main:
     movx @r0,a
     mov r0,#ACT
     movx @r0,a
+    mov r0,#HELP
+    movx @r0,a
+    mov r0,#REDRAW
+    movx @r0,a
 ml:
     call frame_sync
     call key_poll
     call joy_poll
-    mov r0,#KEY                 ; L: leave the table
+    mov r0,#HELP                ; the help screen up: a key takes it down
     movx a,@r0
-    xrl a,#K_L
+    jz ml_keys
+    xrl a,#1
+    jnz ml_net
+    call help_end
+    jmp ml_net
+ml_keys:
+    mov r0,#KEY                 ; H or ?: the help screen
+    movx a,@r0
+    xrl a,#K_H
+    jz ml_help
+    xrl a,#K_H!K_QUEST
+    jz ml_help
+    xrl a,#K_QUEST!K_L          ; L: leave the table
     jnz ml_net
     mov r0,#ACT
     mov a,#ACT_LEAVE
     movx @r0,a
+    jmp ml_net
+ml_help:
+    call phase_page             ; its context: the phase's page - 2
+    mov a,r7
+    add a,#256-2
+    mov r5,a
+    mov r0,#HELP
+    mov a,#1
+    movx @r0,a
+    mov r7,#PG_HELP
+    mov a,#E_HELP
+    FCALL farcall
 ml_net:
     mov r7,#PG_NET
     mov a,#E_NSTEP
@@ -65,8 +93,17 @@ ml_have:
     movx @r0,a
     call st_header
     call st_page
+    mov r0,#HELP                ; (not while the help is up)
+    movx a,@r0
+    xrl a,#1
+    jz ml_idle
     mov a,#E_STATE
     FCALL farcall
+    clr a                       ; the screen is back, if help was up
+    mov r0,#HELP
+    movx @r0,a
+    mov r0,#REDRAW
+    movx @r0,a
 ml_idle:
     mov r0,#ACT                 ; an action goes at once; a poll waits its turn
     movx a,@r0
@@ -85,11 +122,65 @@ ml_begin:
     mov a,#E_NBEGIN
     FCALL farcall
 ml_tick:
+    mov r0,#HELP                ; the phase's ticks wait for its screen
+    movx a,@r0
+    jnz ml_snd
     call tick_page
     mov a,#E_TICK
     FCALL farcall
+ml_snd:
     call snd_go
     jmp ml
+
+    if $ > 900h
+    error "page $8 has run out"
+    endif
+
+; ===========================================================================
+    org 900h
+
+; help_end: a key or the button takes the help screen down: the phase's
+; screen comes back with the next state, polled at once -- a text screen
+; afresh (the lobby, game over), a board as it was (REDRAW). Until then
+; HELP is 2: the states go to the phase, its ticks don't. The key is
+; spent. Clobbers A, r0, r7.
+help_end:
+    mov r0,#KEY
+    movx a,@r0
+    xrl a,#K_NONE
+    jnz he_go
+    mov r0,#JOYEV
+    movx a,@r0
+    anl a,#J_FIRE
+    jnz he_go
+    ret
+he_go:
+    mov r0,#KEY
+    mov a,#K_NONE
+    movx @r0,a
+    mov r0,#JOYEV
+    clr a
+    movx @r0,a
+    mov r0,#POLLW
+    movx @r0,a
+    mov r0,#HELP
+    mov a,#2
+    movx @r0,a
+    mov r0,#REDRAW
+    mov a,#1
+    movx @r0,a
+    call phase_page             ; the lobby and game over: afresh
+    mov a,r7
+    xrl a,#3
+    jz he_fresh
+    xrl a,#3!6
+    jnz he_x
+he_fresh:
+    mov r0,#LSTAT
+    mov a,#0FFh
+    movx @r0,a
+he_x:
+    ret
 
 ; st_header: the header's fields into XRAM, and the clock's second begun.
 ; Clobbers A, r0-r7.
@@ -173,6 +264,10 @@ stp_x:
 
     if $ > 0A00h
     error "page 2's main loop has run out"
+    endif
+
+    if $ > 0A00h
+    error "page $9 has run out"
     endif
 
 ; ===========================================================================

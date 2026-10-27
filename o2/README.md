@@ -7,7 +7,7 @@ once.
 
 It is 8048 assembly (Macroassembler AS), built as a **protocol 2 (APPBANK)**
 image: the fixed 1K of cartridge RAM at `$400-$7FF` holds the display engine,
-and eight 2K pages at `$800` hold everything else. It needs firmware with
+and nine 2K pages at `$800` hold everything else. It needs firmware with
 APPBANK (fujinet-firmware PR #2177, merged 2026-10-24).
 
 Only tested in MAME (`-cartslot fujinet`), never on a real console.
@@ -22,6 +22,7 @@ Only tested in MAME (`-cartslot fujinet`), never on a real console.
 | Placing | moves the ship | keeps it | R turns it, Z places the rest |
 | Battle | moves the cursor | fires | 0 your fleet, 1-3 an opponent, T the target |
 | Anywhere at a table | | | L leaves it |
+| Anywhere but the name | | | H or ? shows the help for that screen; any key or the button goes back |
 
 The name is FujiNet's shared one (appkey creator 1, app 1, key 0). If it is
 empty you type one, and it is kept there.
@@ -95,6 +96,7 @@ It also checks that the fixed half is the same bytes in every page.
 | 5 | the battle's states: boards, seats, sounds |
 | 6 | game over |
 | 7 | the battle's ticks: keys, cursor, fire, clock |
+| 8 | the help screen (H or ?) |
 
 A phase page can't farcall, so the battle is split across two pages: one for
 its states and one for its ticks.
@@ -130,6 +132,8 @@ at the first cell it may.
 What has run, all in MAME against the private server:
 
 - **Boot:** keyboard name entry, the table list, join, and L to leave.
+- **Help:** on every screen. The board comes back as it was (a half-placed
+  fleet, the cursor), and the key that closes it does nothing else.
 - **Placing:** moving, turning and keeping a ship, then Z for the rest.
 - **The views:** target, fleet and opponent.
 - **AI-3:** a self-playing game to game over and back to the lobby, 457

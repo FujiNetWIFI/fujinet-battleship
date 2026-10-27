@@ -121,10 +121,12 @@ J_FIRE  equ 10h
 ; ---- the keyboard (keys.inc): BIOS readkey codes, row x 8 + column ----
 K_0     equ 00h                 ; 0-9 are 00h-09h
 K_SPACE equ 0Ch
+K_QUEST equ 0Dh                 ; ? : help, as H is
 K_L     equ 0Eh
 K_R     equ 13h
 K_T     equ 14h
 K_Z     equ 21h
+K_H     equ 1Dh
 K_YES   equ 2Ch
 K_NO    equ 2Dh
 K_CLR   equ 2Eh
@@ -172,6 +174,15 @@ ROWN    equ SCR0+11             ; the row being built
 SHIPJ   equ SCR0+12             ; mark_ships's ship
 NLIVE   equ SCR0+13             ; live opponents (the target's rows)
 SEATK   equ SCR0+14             ; the seat a loop is on
+
+; ---- the help page (p8.inc): its entry, and what it's help for (r5) ----
+PG_HELP  equ 8
+E_HELP   equ 0
+HC_TABLES equ 0
+HC_LOBBY  equ 1
+HC_PLACE  equ 2
+HC_BATTLE equ 3
+HC_OVER   equ 4
 
 ; ---- page 1's farcall entries ----
 PG_NET   equ 1

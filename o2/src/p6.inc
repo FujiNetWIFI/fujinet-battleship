@@ -23,6 +23,9 @@ go_new:
     mov a,#STATUS_OVER
     movx @r0,a
     call scr_board
+    mov r0,#REDRAW              ; (back from the help screen: no sound)
+    movx a,@r0
+    jnz go_say
     mov r0,#ACTV                ; ours: a fanfare
     movx a,@r0
     jnz go_lose
@@ -32,6 +35,7 @@ go_lose:
     mov a,#SND_LOSE
 go_snd:
     FCALL beep
+go_say:
     mov r6,#L_TOP
     mov r5,#L_BOT
     call say_prompt

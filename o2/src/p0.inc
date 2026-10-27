@@ -127,7 +127,8 @@ tl_put:
     mov r4,a
     jmp say_line_c
 
-; tbl_choose: the stick picks one of NTBL tables; SCTABL = its id. A move
+; tbl_choose: the stick picks one of NTBL tables; SCTABL = its id; then on
+; to bt_join (jumped to from the boot, not called). A move
 ; redraws just the two lines it changes: a whole list takes frames, and a
 ; quick press would be lost meanwhile. Clobbers A, r0-r7.
 tbl_choose:
@@ -136,8 +137,15 @@ tbl_choose:
     movx @r0,a
     call tbl_show
 tc_l:
-    call frame_wait
+    call frame_sync
+    call key_poll
     call joy_poll
+    mov r0,#KEY                 ; H or ?: the help screen
+    movx a,@r0
+    xrl a,#K_H
+    jz tc_help
+    xrl a,#K_H!K_QUEST
+    jz tc_help
     mov r0,#JOYEV
     movx a,@r0
     jb4 tc_take
@@ -176,6 +184,8 @@ tc_move:
     movx a,@r0
     call tbl_line
     jmp tc_l
+tc_help:
+    jmp tbl_help
 tc_take:
     mov r0,#SEL                 ; its id: 8 bytes, NUL-padded
     movx a,@r0
@@ -190,7 +200,7 @@ tc_id:
     djnz r4,tc_id
     clr a
     movx @r1,a
-    ret
+    jmp bt_join
 
     if $ > 900h
     error "page $8 has run out"
@@ -406,9 +416,11 @@ bt_none:
     call wait_fire
     jmp bt_tables
 bt_pick:
-    call tbl_choose             ; SCTABL
+    jmp tbl_choose              ; SCTABL, then bt_join: jumped, not called,
+                                ; so its help screen's farcall fits the stack
 
 ; Join: the first /state.
+bt_join:
     call scr_clear
     mov r4,#2
     mov a,#s_join&0FFh
@@ -653,6 +665,33 @@ nd_put:
     mov r4,#2
     call say_line
     jmp ne_l
+
+; tbl_help: the help screen, until a key or the button; then the list
+; again. Clobbers A, r0-r7.
+tbl_help:
+    mov r5,#HC_TABLES
+    mov r7,#PG_HELP
+    mov a,#E_HELP
+    FCALL farcall
+th_w:
+    call frame_sync
+    call key_poll
+    call joy_poll
+    mov r0,#KEY
+    movx a,@r0
+    xrl a,#K_NONE
+    jnz th_x
+    mov r0,#JOYEV
+    movx a,@r0
+    anl a,#J_FIRE
+    jz th_w
+th_x:
+    call scr_clear
+    mov r4,#0
+    mov a,#s_tables&0FFh
+    call say
+    call tbl_show
+    jmp tc_l
 
 ; A key's character (readkey codes 0-47; 0: none).
 keychar:

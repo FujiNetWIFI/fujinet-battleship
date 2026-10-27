@@ -85,4 +85,6 @@ LIVE    equ 05Eh                ; bit n: seat n is alive (not defeated)
 AUTO    equ 05Fh                ; AUTOPLAY builds: the next cell to try
 SCR0    equ 060h                ; scratch, 16 bytes: per-routine
 OCC     equ 070h                ; 13: placement's cells taken, a bit each
+HELP    equ 07Dh                ; 1: the help screen is up; 2: closing (p2.inc)
+REDRAW  equ 07Eh                ; the phase's screen to come back, as it was
 TMP2    equ 07Fh

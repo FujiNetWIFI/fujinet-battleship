@@ -58,6 +58,11 @@ ps_first:
     call draw_all
     jmp t0_ship
 ps_old:
+    mov r0,#REDRAW              ; back from the help screen
+    movx a,@r0
+    jz ps_old2
+    call pl_back
+ps_old2:
     mov r0,#VIEW
     movx a,@r0
     jnz ps_x                    ; waiting: nothing changes
@@ -225,6 +230,21 @@ ts_say:
     mov r4,#L_BOT
     mov a,#s_keys&0FFh
     jmp say
+
+; pl_back: the board screen back from the help screen: its bands, and T0
+; and T1 (the rows were never touched). Clobbers A, r0-r7.
+pl_back:
+    call bands_board
+    mov r1,#MODE
+    mov a,#MODE_BOARD|MODE_SETUP
+    mov @r1,a
+    mov r0,#VIEW
+    movx a,@r0
+    jnz say_wait
+    mov r0,#PLSENT
+    movx a,@r0
+    jnz say_wait
+    jmp t0_ship
 
 ; say_wait: T0 and T1 while the others place. Clobbers A, r0-r7.
 say_wait:
