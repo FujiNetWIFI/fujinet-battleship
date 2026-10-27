@@ -21,11 +21,15 @@ combinations. So the cart gained an operation for this port:
 
 - **`TOP_MOSAIC`** splits a cell into 2x3 squares of 2 pixels by 4 scanlines.
 - **`TOP_TILE`** defines the 16 tiles a square can be.
-- Both live in `pico/studio2/firmware/src/s2_text.c` on the firmware branch
-  `studio2-mosaic`.
+- Both live in `pico/studio2/firmware/src/s2_text.c` (firmware master).
 
-**Firmware requirement:** a cart, or the grafted MAME device, without that
-branch draws every board blank.
+**Firmware requirement:** a cart, or the grafted MAME device, without them
+draws every board blank. The hit flash also needs protocol 2's `TOP_RECT`.
+
+**The hit flash:** `ghits` (board.inc) counts each seat's hits every poll; a
+seat whose count rose took a shot, and `bflash` XORs a `TOP_RECT` over its
+field three times, so you can see whose fleet was hit or sunk. The first poll
+of a visit only records the counts.
 
 `tiles.inc` defines the tiles; `board.inc` composes a board row, fifteen tile
 pairs, into one `TOP_MOSAIC`. A square's tile is its gamefield byte ORed with
@@ -165,7 +169,7 @@ The build needs:
 
 `src/fujinet.inc`, `s2macro.inc`, `s2call.inc`, `fujilib.inc`,
 `fujidisp.inc` and `input.inc` are verbatim copies of the firmware tree's
-`testrom/`. Copy them after `studio2-mosaic`: `fujinet.inc` has `TOP_TILE`
+`testrom/`. Copy them from master: `fujinet.inc` has `TOP_TILE`
 and `TOP_MOSAIC`.
 
 ## Size and RAM
@@ -235,7 +239,7 @@ One more run rejoined an `AI - 3 BOTS` game left mid-play.
 It runs MAME throttled, since the server's clocks are real time.
 `BS_TABLE`, `S2_NAME` and `BS_LIMIT` override the defaults.
 
-MAME must have the cart from `studio2-mosaic`. Graft it with the firmware's
+MAME must have the cart from firmware master (mosaic and protocol 2). Graft it with the firmware's
 `pico/studio2/emu/apply.sh ~/Workspace/mame-studio2`, then
 `make SUBTARGET=studio2 SOURCES=src/mame/rca/studio2.cpp REGENIE=1 NOWERROR=1`.
 

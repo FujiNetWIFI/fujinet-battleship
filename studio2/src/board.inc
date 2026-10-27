@@ -250,6 +250,174 @@ bbl1:   GLO     RC
         BNZ     bbl1
         FRET
 
+; ---- the hit flash ----------------------------------------------------------
+
+; ghits -- count each seat's hits (gamefield 1) and flag, in V_FLSH, every seat
+; that has more than at the last poll: its board took a shot. Counting rather
+; than reading gamefield[lastAttackPos] because that square may already have
+; been a hit from an earlier shot. V_HCOK is 0 on the first poll of a visit, which
+; only takes the counts.
+        FIT     120
+ghits:  SETV    V_FK, 0
+ghi1:   GETV    V_PC
+        STR     R2
+        GETV    V_FK
+        SM                              ; seat - count: no borrow, no seat
+        BDF     ghi9
+        GETV    V_FK
+        FCALL   prec
+        LDI     PGF
+        FCALL   radd
+        LDI     100
+        PLO     RC
+        LDI     0
+        PHI     R9
+ghi2:   LDA     RB
+        ANI     3
+        XRI     1
+        BNZ     ghi3
+        GHI     R9
+        ADI     1
+        PHI     R9
+ghi3:   DEC     RC
+        GLO     RC
+        BNZ     ghi2
+        LDI     0
+        PHI     RC                      ; RC.1: this seat rose
+        GETV    V_FK
+        ADI     LO(V_HC)
+        PLO     RA
+        LDN     RA
+        STR     R2
+        GHI     R9
+        SM                              ; new - old
+        BNF     ghi4                    ; fewer: a new game
+        BZ      ghi4
+        GETV    V_HCOK
+        BZ      ghi4
+        LDI     1
+        PHI     RC
+ghi4:   GETV    V_FK
+        ADI     LO(V_HC)
+        PLO     RA
+        GHI     R9
+        STR     RA
+        GHI     RC
+        BZ      ghi5
+        GETV    V_FK
+        ADI     LO(V_FLSH)
+        PLO     RA
+        LDI     1
+        STR     RA
+        SETV    V_FANY, 1
+ghi5:   GETV    V_FK
+        ADI     1
+        STR     RA
+        BR      ghi1
+ghi9:   SETV    V_HCOK, 1
+        FRET
+
+; hreset -- no game on: the counts are zero, and the next ones only recorded.
+        FIT     40
+hreset: SETV    V_HCOK, 0
+        LDI     0
+        PLO     RC
+hrs1:   GLO     RC
+        ADI     LO(V_HC)
+        PLO     RA
+        LDI     0
+        STR     RA
+        INC     RC
+        GLO     RC
+        XRI     4
+        BNZ     hrs1
+        FRET
+
+; bfrects -- XOR the field (square rows 1-10) of every flagged seat's board.
+        FIT     120
+bfrects:
+        SETV    V_FK, 0
+bfr1:   GETV    V_FK
+        ADI     LO(V_FLSH)
+        PLO     RA
+        LDN     RA
+        BZ      bfr2
+        GETV    V_FK
+        ADI     LO(orgrc)
+        FCALL   tbyte
+        PLO     R9                      ; the board's first cell, $rc
+        ANI     0FH                     ; x = 4 pixels a column
+        SHL
+        SHL
+        HOT     TX_PARAM
+        GLO     R9                      ; y = 12 lines a row, + 4 for the pips
+        SHR
+        SHR
+        SHR
+        SHR
+        SHL
+        SHL
+        STR     R2
+        SHL
+        ADD
+        ADI     4
+        HOT     TX_PARAM
+        LDI     20                      ; 5 cells wide
+        HOT     TX_PARAM
+        LDI     40                      ; 10 squares of 4 lines
+        HOT     TX_PARAM
+        LDI     TM_XOR
+        HOT     TX_PARAM
+        LDI     TOP_RECT
+        HOT     TX_OP
+bfr2:   GETV    V_FK
+        ADI     1
+        STR     RA
+        XRI     4
+        BNZ     bfr1
+        FRET
+
+; bfwait -- FLASHF frames, the keypads watched.
+FLASHF  EQU     8
+        FIT     24
+bfwait: GLO     RE
+        PUTV    V_T0
+bfw1:   FCALL   kpoll
+        GETV    V_T0
+        STR     R2
+        GLO     RE
+        SM
+        SMI     FLASHF
+        BNF     bfw1
+        FRET
+
+; bflash -- flash every flagged board three times: six XORs, an even number,
+; so each field ends as it was. Run after the boards are drawn and before the
+; wait, which redefines tiles (and redraws cells) under an inverted field.
+        FIT     64
+bflash: GETV    V_FANY
+        BZ      bfl9
+        SETV    V_FN, 6
+bfl1:   FCALL   bfrects
+        FCALL   bfwait
+        GETV    V_FN
+        SMI     1
+        STR     RA
+        BNZ     bfl1
+        SETV    V_FANY, 0
+        LDI     0
+        PLO     RC
+bfl2:   GLO     RC
+        ADI     LO(V_FLSH)
+        PLO     RA
+        LDI     0
+        STR     RA
+        INC     RC
+        GLO     RC
+        XRI     4
+        BNZ     bfl2
+bfl9:   FRET
+
 ; ---- MAP -------------------------------------------------------------------
 
 ; mclear -- MAP all zero.

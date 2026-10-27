@@ -99,7 +99,13 @@ V_MBAD  EQU     V_APP+7BH       ; 1: the last T_PLC mark lay on another ship
 V_FLOOR EQU     V_APP+7CH       ; 2: the next poll's settle minimum (lo, hi)
 V_PSUM  EQU     V_APP+7EH       ; the lobby prompt's checksum
 V_OLDY  EQU     V_APP+7FH       ; the cursor row before a move
-V_END   EQU     V_APP+80H
+V_HC    EQU     V_APP+80H       ; 4: each seat's hits taken, as last counted
+V_HCOK  EQU     V_APP+84H       ; 1: V_HC is of this game, so a rise is news
+V_FLSH  EQU     V_APP+85H       ; 4: 1 = this seat's board took a hit: flash it
+V_FANY  EQU     V_APP+89H       ; 1: any V_FLSH is set
+V_FK    EQU     V_APP+8AH       ; a seat, for the flash loops
+V_FN    EQU     V_APP+8BH       ; flash phases left
+V_END   EQU     V_APP+90H
 
         IF      HI(V_END) <> HI(RAMVARS)
         ERROR   "RAM ledger runs off page $08"

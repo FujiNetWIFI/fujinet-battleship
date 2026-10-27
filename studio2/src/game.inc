@@ -45,6 +45,7 @@ st_game:
         SETV    V_MODE, M_TEXT
         SETV    V_FLOOR, GMINLEN
         SETV    V_FLOOR+1, 0
+        FCALL   hreset
         FCALL   d_cls
         PUTS    40H, s_joining
         FJMP    gpoll
@@ -262,9 +263,11 @@ gc8:    GETV    V_ACT
         FIT     24
 gshow:  GETV    V_ST
         BNZ     gsh1
+        FCALL   hreset
         FJMP    globby
 gsh1:   XRI     ST_PLACE
         BNZ     gsh2
+        FCALL   hreset
         FJMP    gplace
 gsh2:   FJMP    gplay
 
@@ -386,6 +389,8 @@ gp2:    GETV    V_PST
 gp3:    FCALL   gnames
         FCALL   gboards
         FCALL   gpanel
+        FCALL   ghits
+        FCALL   bflash
         FJMP    gwait
 
 ; gboards -- every seat's board. Ours with our hulls (unless we only watch);
