@@ -1,0 +1,41 @@
+# battle.scen -- AI-1: ready, auto-place, then a few shots.
+wait 300
+hold down 3
+wait 20
+hold down 3
+wait 20
+hold down 3
+wait 20
+hold down 3
+wait 20
+press fire
+wait 150
+press fire
+until 39 1 900
+wait 60
+key Z
+until 39 10 900
+wait 120
+snap start
+xram 38 8
+xram 47 8
+until 3B 0 1200
+wait 60
+snap myturn
+xram 38 8
+xram 47 8
+hold right 3
+wait 10
+hold down 3
+wait 10
+snap aim
+press fire
+wait 120
+snap fired
+xram 38 8
+key 0
+wait 60
+snap fleet
+key 1
+wait 60
+snap opp1

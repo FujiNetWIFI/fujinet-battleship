@@ -1,0 +1,22 @@
+# name.scen -- no name appkey: type one (a rub-out on the way), the table
+# list, join Cape Fuji, then L leaves for the table list again.
+wait 200
+snap ask
+type BOBX
+key CLR
+type B2
+wait 10
+snap typed
+key ENT
+wait 200
+snap tables
+xram 20 9
+hold down 3
+wait 20
+press fire
+wait 200
+snap lobby
+key L
+wait 200
+snap left
+xram 29 9
