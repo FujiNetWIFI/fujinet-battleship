@@ -34,6 +34,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# The image has to talk to this rig's server: one built for any other
+# (make, not make rig) would play the live server from here.
+IMAGE=${4:-build/battleship.bin}
+if ! grep -aq "http://localhost:$BS_PORT/" "$IMAGE"; then
+    echo "rig: $IMAGE isn't built for http://localhost:$BS_PORT/ (make rig)" >&2
+    exit 1
+fi
+
 for port in "$BS_PORT" "$BOIP" "$((BOIP - 10000))"; do
     if ss -ltn | grep -q ":$port "; then echo "rig: port $port is taken" >&2; exit 1; fi
 done

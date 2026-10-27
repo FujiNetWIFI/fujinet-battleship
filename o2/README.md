@@ -41,8 +41,21 @@ once (the 2600's and the Studio II's layout) can't be done. The O2 shows
 
 A key's board stays until the turn changes. T0 at the top says whose turn
 it is, in their colour, with the seconds left. T1 at the bottom shows each
-seat's name and ships afloat, in its colour. At game over the winner's board
-shows their fleet at last.
+seat's name and ships afloat, in its colour. At game over T0 says who won
+("CLYD BOT WINS", "YOU WIN"), T1 keeps the tally, and the board is the
+winner's, their fleet shown at last.
+
+### Screenshots
+
+From MAME, against a private server (`screenshots/`, taken by
+`test/scen/shots.scen`):
+
+| | | |
+|---|---|---|
+| ![the target](screenshots/08_target.png) | ![your fleet](screenshots/10_fleet.png) | ![an opponent's board](screenshots/11_opponent.png) |
+| The target: hits on any opponent, misses on all | Your fleet, under fire | An opponent's board, in its colour |
+| ![placing](screenshots/07_placing_next.png) | ![help](screenshots/09_help_battle.png) | ![game over](screenshots/12_game_over.png) |
+| Placing: the carrier kept, the battleship next | Help in the battle (H or ?) | Game over: the winner's fleet |
 
 ### How it's drawn
 

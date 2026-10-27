@@ -223,12 +223,12 @@ clock:
     jz ck_x
     dec a
     movx @r0,a
+    mov r1,a                    ; the seconds: T0 shows them?
     mov r0,#LINEBUF+15
-    xch a,r0
     movx a,@r0
     xrl a,#' '
     jz ck_x
-    mov a,r0
+    mov a,r1
     mov r1,#LINEBUF+13
     call lb_num3
     mov r4,#L_TOP

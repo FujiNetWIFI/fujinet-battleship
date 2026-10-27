@@ -2,10 +2,10 @@
 """player.py -- a second human for the rig: plays Battleship over HTTP.
 
     player.py [--server URL] [--table ID] [--name NAME] [--delay S]
-              [--sleep-turns N] [--leave-after N] [--games N]
+              [--sleep-turns N] [--leave-after N] [--games N] [--fleet a,b,c,d,e]
 
-Joins TABLE as NAME, readies in the lobby, places a fixed fleet (five ships
-across rows 0-4 at x=0), and on its turn fires at the first cell some live
+Joins TABLE as NAME, readies in the lobby, places a fixed fleet (FLEET, as
+the server takes it: pos + 100*dir; five ships across rows 0-4 at x=0), and on its turn fires at the first cell some live
 opponent hasn't marked, DELAY seconds into the turn. --sleep-turns N lets
 its first N turns time out (the server skips them); --leave-after N leaves
 the table after N shots. Reads the binary v=2 state, the same bytes the O2
@@ -51,6 +51,7 @@ def main():
     ap.add_argument("--sleep-turns", type=int, default=0)
     ap.add_argument("--leave-after", type=int, default=-1)
     ap.add_argument("--games", type=int, default=1)
+    ap.add_argument("--fleet", default="0,10,20,30,40")
     a = ap.parse_args()
     shots, slept, games, seen, turn_at, sleeping = 0, 0, 0, None, None, False
     while True:
@@ -69,7 +70,7 @@ def main():
         if s["status"] == 0 and s["pstat"] != 3 and s["n"] > 1:
             get(a.server, "ready/1", a.table, a.name)
         elif s["status"] == 1 and s["pstat"] == 10:
-            get(a.server, "place/0,10,20,30,40", a.table, a.name)
+            get(a.server, "place/" + a.fleet, a.table, a.name)
         elif s["status"] in (10, 11, 12, 13) and s["active"] == 0 and s["pstat"] == 0:
             if slept < a.sleep_turns:
                 sleeping = True

@@ -1,5 +1,5 @@
-; p6.inc -- page 6: game over (status 99). The server's prompt -- who won
-; -- over T0 and T1, a fanfare or a dirge, and the winner's board: their
+; p6.inc -- page 6: game over (status 99). T0 says who won, in their
+; colour, T1 the tally; a fanfare or a dirge; and the winner's board: their
 ; fleet, shown at last (myShips 5-9, or ours), under the shots it took. A
 ; game abandoned while the fleets were being placed has no boards (its
 ; seats are 10-byte records): the prompt alone. The table goes back to the
@@ -36,9 +36,7 @@ go_lose:
 go_snd:
     FCALL beep
 go_say:
-    mov r6,#L_TOP
-    mov r5,#L_BOT
-    call say_prompt
+    call go_text
     mov r0,#ACTV                ; nobody won: no board
     movx a,@r0
     add a,#256-4
@@ -166,6 +164,146 @@ bf_n:
 ; ===========================================================================
     org 0A00h
     include "text.inc"
+
+; go_text: T0 = who won, in their colour: "YOU WIN", or their name and
+; WINS (the font has no !). T1 = the tally: each seat's name and ships
+; afloat, as in the battle. (The server's own words are 17-23 characters,
+; past a line.) A game nobody won (aborted): its prompt over both.
+; Clobbers A, r0-r7.
+go_text:
+    mov r0,#ACTV
+    movx a,@r0
+    mov r5,a
+    add a,#256-4
+    jnc gt_won
+    mov r6,#L_TOP
+    mov r5,#L_BOT
+    jmp say_prompt
+gt_won:
+    call lb_clear
+    mov a,r5
+    jnz gt_them
+    mov a,#s_youwin&0FFh
+    call lb_str
+    jmp gt_say
+gt_them:
+    mov a,r5
+    call seat_name              ; LINEBUF = the name, NUL as space
+    mov r7,#8                   ; its length: the last non-space
+gt_len:
+    mov a,r7
+    add a,#LINEBUF-1
+    mov r0,a
+    movx a,@r0
+    xrl a,#' '
+    jnz gt_lx
+    djnz r7,gt_len
+gt_lx:
+    mov a,r7
+    add a,#LINEBUF
+    mov r0,a
+    mov a,#s_wins&0FFh
+    call lb_at
+gt_say:
+    mov a,r5
+    call seat_col
+    mov r0,#TXCOL
+    movx @r0,a
+    inc r0
+    movx @r0,a
+    mov r4,#L_TOP
+    call say_line_c
+    call lb_clear               ; T1: the tally, each seat's name (3) and
+    clr a                       ; ships afloat, in its colour
+gt_t:
+    mov r0,#TMP0
+    movx @r0,a
+    mov r5,a
+    mov r0,#NSEAT
+    movx a,@r0
+    xrl a,r5
+    jz gt_t1
+    mov a,r5                    ; LINEBUF + 4k: the name's first 3
+    rl a
+    rl a
+    add a,#LINEBUF
+    mov r1,a
+    mov r4,#3
+    mov a,r5
+    call seat_nm
+    mov a,r5                    ; its ships afloat: 5 bytes at +SE_LEFT
+    add a,#seatn&0FFh
+    mov r0,a
+    add a,#4
+    movp a,@a
+    mov r3,a                    ; the record, high byte ...
+    mov a,r0
+    movp a,@a
+    add a,#SE_LEFT              ; ... low byte, + SE_LEFT
+    mov r2,a
+    clr a
+    addc a,r3
+    mov r3,a
+    mov r4,#5
+    mov r7,#'0'
+gt_l:
+    call st_byte
+    jz gt_l0
+    inc r7
+gt_l0:
+    inc r2
+    djnz r4,gt_l
+    mov a,r7
+    movx @r1,a
+    mov r0,#TMP0
+    movx a,@r0
+    inc a
+    xrl a,#4
+    jz gt_t1
+    xrl a,#4
+    jmp gt_t
+gt_t1:
+    mov r0,#TXCOL
+    mov a,#80h                  ; each four columns in their seat's colour
+    movx @r0,a
+    inc r0
+    movx @r0,a
+    mov r4,#L_BOT
+    jmp say_line_c
+
+; seat_name: seat A's name (8) into LINEBUF; seat_nm: r4 of its characters
+; into LINEBUF at r1 (a NUL as a space). Clobbers A, r0-r3, r6.
+seat_name:
+    mov r1,#LINEBUF
+    mov r4,#8
+seat_nm:
+    add a,#seatn&0FFh
+    mov r0,a
+    movp a,@a
+    mov r2,a
+    mov a,r0
+    add a,#4
+    movp a,@a
+    mov r3,a
+sn_l:
+    call st_byte
+    jnz sn_1
+    mov a,#' '
+sn_1:
+    movx @r1,a
+    inc r1
+    inc r2
+    djnz r4,sn_l
+    ret
+seatn:                          ; each seat's record: low bytes, high bytes
+    db (ST_SEATS)&0FFh, (ST_SEATS+SEAT_PLAY)&0FFh
+    db (ST_SEATS+2*SEAT_PLAY)&0FFh, (ST_SEATS+3*SEAT_PLAY)&0FFh
+    db (ST_SEATS)>>8, (ST_SEATS+SEAT_PLAY)>>8
+    db (ST_SEATS+2*SEAT_PLAY)>>8, (ST_SEATS+3*SEAT_PLAY)>>8
+
+s_youwin: db "YOU WIN",0
+s_wins:   db " WINS",0
+
 
     if $ > 0B00h
     error "page $A has run out"
