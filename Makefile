@@ -74,10 +74,9 @@ ifeq ($(PLATFORM),c64)
 endif
 
 ## ColecoVision (z88dk +coleco, FujiNet mailbox cartridge). Not in PLATFORMS:
-## it needs fujinet-lib-experimental (the only lib with the coleco bus), so
-## build with either
-##   ./make-exp coleco                                      (clones + builds the lib)
-##   make coleco FUJINET_LIB=$(HOME)/Workspace/fujinet-lib-experimental
+## the coleco bus is in fujinet-lib itself (FujiNetWIFI/fujinet-lib#281, branch
+## add-coleco), no longer in fujinet-lib-experimental, so build with
+##   make FUJINET_LIB=<that lib's checkout> PLATFORMS=coleco coleco
 ## z88dk puts -D__COLECO__ in the target-wide OPTIONS line, so the Adam
 ## subtype defines it too -- __COLECO__ alone does not mean ColecoVision.
 ## src/coleco is therefore guarded by BUILD_COLECO.

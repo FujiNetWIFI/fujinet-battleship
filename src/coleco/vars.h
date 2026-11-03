@@ -11,7 +11,7 @@
 #define GAMEOVER_PROMPT_Y HEIGHT - 2
 
 // The whole reply to the last mailbox transaction, as directly addressable
-// cartridge ROM. fujinet-lib-experimental bus/coleco/fujinet-bus-coleco.h
+// cartridge ROM. fujinet-lib bus/coleco/fujinet-bus-coleco.h
 // (FN_REPLY) is the source of truth; keep the two in step.
 //
 // This is where ClientState lives on this platform (see src/misc.h). The
