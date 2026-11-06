@@ -11,6 +11,7 @@ This is a WIP cross platform game client for the Fuji Battleships server.
 * **MS-Dos**
 * **NES** (FujiNet NES cartridge)
 * **Sega Master System** (FujiNet SMS cartridge)
+* **Heathkit H89** (H89 FujiNet card; HDOS and CP/M)
 * **Atari 7800** (FujiNet 7800 cartridge)
 * **Atari 5200** (FujiNet 5200 cartridge)
 * **Odyssey 2 / Videopac** (FujiNet O2 cartridge): see [o2/README.md](o2/README.md)
@@ -52,6 +53,15 @@ The output is `r2r/sms/fbs.sms`, a flat 32K image stamped with the "FUJI" claim 
 * `make sms-play`
 
 Controls: d-pad moves, 1 selects/fires/readies, 2 refreshes/rotates, Pause opens the in-game menu. Holding 2 shifts: 2+Up help, 2+Down sound, 2+Left/Right change name, 2+1 quit.
+
+### Heathkit H89
+Built with z88dk (`zcc +hdos` / `zcc +cpm`) against the `h89-support` branch of fujinet-lib, checked out at `~/Workspace/fujinet-lib` (the Makefile points both H89 builds there). Both builds share `src/h89`:
+* HDOS: `make PLATFORMS=h89-hdos h89-hdos` makes `r2r/h89-hdos/fbs.abs`, and `fbs.h8d`, a 100K H17 disk holding `FBS.ABS`: `MOUNT SY1:` then `RUN SY1:FBS.ABS`
+* CP/M: `make PLATFORMS=h89-cpm h89-cpm` makes `r2r/h89-cpm/fbs.com`, and `fbs.h8d`, an H17 disk holding `FBS.COM`: `B:FBS`
+
+The disks need z88dk's `z88dk-appmake` on the PATH. The game draws on the H19 terminal in 80x24 with its graphics characters, reverse video and cursor addressing, and sends only what changes on screen, since the console runs at 9600 baud. Test it in FujiNet Go H89 (`~/Workspace/fujinet-go-h89-desktop`), with the disk in drive 2 beside its HDOS 2.0 or 64K CP/M boot disk.
+
+Controls: the keypad arrows (or `,` `.` `-` `=`) move, SPACE or RETURN selects/fires/readies, `R` refreshes/rotates, ESC (or f1-f5) opens the in-game menu, and `H`, `N`, `S` and `Q` are help, name, sound and quit. Quitting returns to HDOS or CP/M.
 
 ### Atari 7800
 Built with cc65 against the `add-atari7800` branch of fujinet-lib-experimental (the only lib with the 7800 cartridge bus and its crt0; the linker config and romstamp are in `mekkogx/`):

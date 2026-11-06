@@ -6,7 +6,7 @@
 
 // Include platform specific vars - this is defined in the Makefile as "../$(PLATFORM)/vars.h"
 // Watcom / wine has issues with \" in the define, so hacking this for now
-// zcc (Adam/ColecoVision/Master System) gets the same treatment to avoid the \" quoting through defoogi.
+// zcc (Adam/ColecoVision/Master System/H89) gets the same treatment to avoid the \" quoting through defoogi.
 // Note z88dk defines __COLECO__ for the Adam subtype too, so the ColecoVision
 // build is keyed on BUILD_COLECO instead.
 #if __MSDOS__
@@ -17,6 +17,8 @@
 #include "../coleco/vars.h"
 #elif defined(BUILD_SMS)
 #include "../sms/vars.h"
+#elif defined(__H89__)
+#include "../h89/vars.h"
 #else
 #include PLATFORM_VARS
 #endif
