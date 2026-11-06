@@ -1,0 +1,52 @@
+# help.scen -- the help screen on H and ?, everywhere, and each screen back
+# as it was: the table list, the lobby, placing (a ship kept), the battle.
+wait 300
+key H
+wait 60
+snap h_tables
+key SPACE
+wait 60
+snap tables
+hold down 3
+wait 20
+hold down 3
+wait 20
+hold down 3
+wait 20
+hold down 3
+wait 20
+press fire
+wait 150
+key ?
+wait 60
+snap h_lobby
+press fire
+wait 90
+snap lobby
+press fire
+until 39 1 900
+wait 60
+hold right 3
+wait 20
+press fire
+wait 60
+snap place
+xram 4D 6
+key H
+wait 60
+snap h_place
+key SPACE
+wait 90
+snap place_back
+xram 4D 6
+key Z
+until 39 10 900
+until 3B 0 1200
+wait 60
+key H
+wait 60
+snap h_battle
+press fire
+wait 90
+snap battle_back
+xram 5C 1

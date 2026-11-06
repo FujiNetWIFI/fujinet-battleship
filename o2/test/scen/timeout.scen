@@ -1,0 +1,13 @@
+# timeout.scen -- an AUTOPLAY=1 build against test/player.py --sleep-turns 1
+# at Cape Fuji: the player's first turn runs out and the server passes it on.
+wait 300
+hold down 3
+wait 20
+press fire
+until 39 10 3600
+until 3B 1 3600
+snap theirs
+until 3B 0 4000
+wait 30
+snap ours
+xram 38 8

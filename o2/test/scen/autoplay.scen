@@ -1,0 +1,24 @@
+# autoplay.scen -- an AUTOPLAY=1 build plays AI-1 to the end and back to
+# the lobby: join (the last table), then it readies, places and fires itself.
+wait 300
+hold down 3
+wait 20
+hold down 3
+wait 20
+hold down 3
+wait 20
+hold down 3
+wait 20
+press fire
+until 39 10 2400
+wait 300
+snap battle1
+until 39 99 30000
+wait 30
+snap over
+xram 38 8
+wait 200
+snap over2
+until 39 0 2400
+wait 120
+snap lobby2

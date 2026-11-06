@@ -1,0 +1,24 @@
+# over.scen -- game over, ended early by the server's debug route
+# (test/endgame.py run beside it: it ends the battle 8 s in): AI-1.
+wait 300
+hold down 3
+wait 20
+hold down 3
+wait 20
+hold down 3
+wait 20
+hold down 3
+wait 20
+press fire
+wait 150
+press fire
+until 39 1 900
+wait 60
+key Z
+until 39 10 900
+until 39 99 3000
+burst over 40
+wait 120
+snap over_late
+cart 539 33
+cart 55A 33

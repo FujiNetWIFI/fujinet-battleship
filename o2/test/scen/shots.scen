@@ -1,0 +1,70 @@
+# shots.scen -- screenshots/, by hand (make shots): no name appkey, AI-3.
+wait 50
+snap 01_title
+wait 250
+type SAILOR
+wait 20
+snap 02_name
+key ENT
+wait 250
+hold down 3
+wait 20
+hold down 3
+wait 30
+snap 03_tables
+key H
+wait 60
+snap 04_help_tables
+key SPACE
+wait 30
+press fire
+wait 200
+snap 05_lobby
+press fire
+until 39 1 900
+wait 90
+hold right 3
+wait 20
+hold down 3
+wait 40
+snap 06_placing
+press fire
+wait 90
+snap 07_placing_next
+key Z
+until 39 10 900
+until 3B 0 2400
+wait 90
+snap 08_target
+press fire
+until 3B 1 600
+until 3B 0 2400
+hold down 3
+wait 10
+press fire
+until 3B 1 600
+until 3B 0 2400
+hold down 3
+wait 10
+press fire
+until 3B 1 600
+until 3B 0 2400
+hold right 3
+wait 10
+press fire
+until 3B 1 600
+until 3B 0 2400
+hold right 3
+wait 90
+snap 09_target_shots
+key H
+wait 60
+snap 10_help_battle
+key SPACE
+wait 90
+key 0
+wait 90
+snap 11_fleet
+key 2
+wait 90
+snap 12_opponent

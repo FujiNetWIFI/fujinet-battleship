@@ -1,0 +1,9 @@
+# boot.scen -- title, the name from the appkey, the table list.
+wait 150
+snap title
+wait 150
+snap tables
+press down
+wait 10
+snap tables2
+xram 20 18

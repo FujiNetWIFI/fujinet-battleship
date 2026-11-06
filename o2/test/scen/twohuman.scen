@@ -1,0 +1,22 @@
+# twohuman.scen -- an AUTOPLAY=1 build against test/player.py at Cape Fuji
+# (the second table): the lobby's ready handshake, the turns passing between
+# two humans (one of the player's timing out), game over, back to the lobby.
+wait 300
+hold down 3
+wait 20
+press fire
+wait 200
+snap lobby
+until 39 10 3600
+wait 300
+snap battle
+until 3B 1 30000
+wait 60
+snap theirs
+until 39 99 60000
+wait 30
+snap over
+xram 38 8
+until 39 0 2400
+wait 120
+snap lobby2

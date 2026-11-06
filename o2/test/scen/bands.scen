@@ -1,0 +1,25 @@
+# bands.scen -- AI-1, our turn: 120 frames while the cursor moves and the
+# polls run, then 120 on our fleet while the bot fires; tools/rowcheck.py.
+wait 300
+hold down 3
+wait 20
+hold down 3
+wait 20
+hold down 3
+wait 20
+hold down 3
+wait 20
+press fire
+wait 150
+press fire
+until 39 1 900
+wait 60
+key Z
+until 39 10 900
+until 3B 0 1200
+wait 30
+hold right 20
+burst turn 120
+press fire
+until 3B 1 600
+burst theirs 120

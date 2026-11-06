@@ -1,0 +1,9 @@
+# spike.scen -- the SPIKE build's board: a still, the cursor moved, a burst.
+wait 120
+snap board
+press right
+press right
+press down
+wait 4
+snap cursor
+burst rows 60

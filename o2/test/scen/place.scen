@@ -1,0 +1,36 @@
+# place.scen -- join AI-1 (the last table), ready, place the fleet.
+wait 300
+hold down 3
+wait 20
+hold down 3
+wait 20
+hold down 3
+wait 20
+hold down 3
+wait 20
+press fire
+wait 150
+snap lobby
+press fire
+until 39 1 900
+wait 60
+snap place0
+xram 4D 8
+hold right 3
+wait 20
+hold down 3
+wait 20
+snap moved
+key R
+wait 30
+snap turned
+xram 4D 8
+press fire
+wait 60
+snap kept
+xram 4D 8
+key Z
+wait 90
+snap auto
+xram 38 8
+xram 4D 8

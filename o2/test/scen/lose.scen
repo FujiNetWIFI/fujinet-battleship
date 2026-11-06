@@ -1,0 +1,13 @@
+# lose.scen -- an AUTOPLAY=1 build loses a real game to test/player.py at
+# Cape Fuji (its fleet in the last rows): game over as it comes, frame by frame.
+wait 300
+hold down 3
+wait 20
+press fire
+until 39 10 3600
+until 39 99 40000
+burst over 30
+wait 200
+snap over_late
+cart 539 33
+cart 55A 33

@@ -31,7 +31,10 @@ FDEV	EQU 070H
 FC_AKOPN EQU 0DCH		; OPEN_APPKEY
 FC_AKRD	EQU 0DDH		; READ_APPKEY
 FC_AKWR	EQU 0DEH		; WRITE_APPKEY
+; The OPEN struct is SIX bytes -- creator lo, creator hi, app, key, mode,
+; reserved -- sent as the payload, not as parameters (see AKOPEN).
 AKCREAT	EQU 1			; the shared username every client reads
+AKCREAH	EQU 0
 AKAPP	EQU 1
 AKKEY	EQU 0
 AKRDMOD	EQU 0

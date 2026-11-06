@@ -1,0 +1,16 @@
+# lobby.scen -- join AI-1 (the last table), the lobby, ready.
+wait 300
+press down
+press down
+press down
+press down
+wait 10
+snap tables
+press fire
+wait 120
+snap lobby
+xram 38 8
+press fire
+wait 40
+snap ready
+xram 38 8

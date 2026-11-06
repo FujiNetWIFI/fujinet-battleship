@@ -12,6 +12,9 @@ This is a WIP cross platform game client for the Fuji Battleships server.
 * **NES** (FujiNet NES cartridge)
 * **Sega Master System** (FujiNet SMS cartridge)
 * **Heathkit H89** (H89 FujiNet card; HDOS and CP/M)
+* **Atari 7800** (FujiNet 7800 cartridge)
+* **Atari 5200** (FujiNet 5200 cartridge)
+* **Odyssey 2 / Videopac** (FujiNet O2 cartridge): see [o2/README.md](o2/README.md)
 * *Please contribute to add more!*
 
 ### To Build
@@ -59,6 +62,26 @@ Built with z88dk (`zcc +hdos` / `zcc +cpm`) against the `h89-support` branch of 
 The disks need z88dk's `z88dk-appmake` on the PATH. The game draws on the H19 terminal in 80x24 with its graphics characters, reverse video and cursor addressing, and sends only what changes on screen, since the console runs at 9600 baud. Test it in FujiNet Go H89 (`~/Workspace/fujinet-go-h89-desktop`), with the disk in drive 2 beside its HDOS 2.0 or 64K CP/M boot disk.
 
 Controls: the keypad arrows (or `,` `.` `-` `=`) move, SPACE or RETURN selects/fires/readies, `R` refreshes/rotates, ESC (or f1-f5) opens the in-game menu, and `H`, `N`, `S` and `Q` are help, name, sound and quit. Quitting returns to HDOS or CP/M.
+
+### Atari 7800
+Built with cc65 against the `add-atari7800` branch of fujinet-lib-experimental (the only lib with the 7800 cartridge bus and its crt0; the linker config and romstamp are in `mekkogx/`):
+* `make PLATFORMS=atari7800 atari7800 FUJINET_LIB=<a checkout of that branch>`
+
+The output is `r2r/atari7800/fbs.bin` (32K at $8000, for the cartridge) and `r2r/atari7800/fbs.a78` (for MAME), stamped with the "FUJI" claim and checked for stores to $00-$1F. The screen is the shared MARIA text and tile engine (`src/atari7800/maria.s`); `src/atari7800/mkchr.py` fits the MS-DOS art into its 128 tiles and two palettes before every build. Sound is the cartridge's POKEY. Test in MAME with the FujiNet 7800 cartridge against fujinet-pc:
+* `make atari7800-smoke EXPECT="FUJI BATTLESHIP" [SCRIPT="until:ai_-_1_on_1,down,fire"] [SNAP=/path/shot.png] [A7800_SYSTEM=a7800p]`
+* `make atari7800-play`
+
+Controls: joystick moves, button 1 selects/fires, button 2 (or RESET) refreshes/rotates, PAUSE opens the in-game menu, SELECT changes name, SELECT+1 help, SELECT+2 sound, SELECT+PAUSE quit.
+
+### Atari 5200
+Built with cc65 against the `atari5200` target of fujinet-lib-experimental (the only lib with the 5200 cartridge bus and its crt0; the linker config and romstamp are in `mekkogx/`):
+* `make PLATFORMS=atari5200 atari5200 FUJINET_LIB=<a checkout of that branch>`
+
+The output is `r2r/atari5200/fbs.bin`, a flat 32K image at $4000-$BFFF for the cartridge and MAME's `-cart`, checked for the "FUJI" claim and for stores into the cart window. The screen is the Atari 8-bit's: ANTIC mode 4 with `support/atari/charset.fnt`, its charset copy, screen and player graphics in the top 4K of RAM. Test in MAME's `a5200` driver with the FujiNet 5200 cartridge against fujinet-pc:
+* `make atari5200-smoke EXPECT="FUJI BATTLESHIP" [SCRIPT="until:ai_-_1_on_1,down,fire"] [SNAP=/path/shot.png]`
+* `make atari5200-play`
+
+Controls: stick moves, top fire (or # or START) selects/fires/readies, lower fire (or 1) refreshes/rotates, PAUSE (or *) opens the in-game menu, 2 help, 3 sound, 4 changes name, 5 quit. Name entry is an on-screen keyboard: top fire types, lower fire or * deletes, the digits type themselves, START or # accepts.
 
 ### Build Output - in /r2r
 
