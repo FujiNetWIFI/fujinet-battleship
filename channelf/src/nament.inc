@@ -63,6 +63,8 @@ SNDM2:	LI ST_GAME
 	XDC
 	PI UIFOOT
 
+	LI AKRDMOD
+	LR 1,A
 	PI AKOPEN
 	OI 0
 	BNZ SNTYPE
@@ -114,29 +116,34 @@ SNTYPE:	DCI VENTRY
 	JMP GOTO
 
 ; ---------------------------------------------------------------------------
-; AKOPEN -- OPEN_APPKEY(creator, app, key, read mode). Four one-byte params.
+; AKOPEN -- OPEN_APPKEY(creator, app, key, mode r1). No parameters: the
+;   request is a SIX-BYTE PACKED STRUCT in the payload -- creator lo, creator
+;   hi, app, key, mode, reserved. AppKeyMixin::appkey_open() reads it with one
+;   transaction_get_length() and refuses anything but exactly six bytes, so
+;   sent as parameters it arrives as an empty payload and fails.
 ;   Reached by PI; calls one level down.
-; ---------------------------------------------------------------------------
 AKOPEN:	ENTER
+	LR A,1
+	LR 10,A			; the mode, past anything FNBEG touches
 	LI FDEV
 	LR 0,A
 	LI FC_AKOPN
 	LR 1,A
-	LIS 4
+	CLR
 	LR 2,A
-	PI FNBEG
+	PI FNBEG		; leaves DC0 on the TX page: bytes stored there append
 	LI AKCREAT
-	LR 0,A
-	PI FNPB
+	ST
+	LI AKCREAH
+	ST
 	LI AKAPP
-	LR 0,A
-	PI FNPB
+	ST
 	LI AKKEY
-	LR 0,A
-	PI FNPB
-	LI AKRDMOD
-	LR 0,A
-	PI FNPB
+	ST
+	LR A,10
+	ST
+	CLR
+	ST			; reserved, and not optional
 	PI FNGO
 	PI FNACK
 	LEAVE
@@ -157,26 +164,11 @@ AKREAD:	ENTER
 ;   fixed-width field. Best effort -- an adapter that will not store it is not
 ;   a reason to refuse to play.
 AKWRITE: ENTER
-	LI FDEV
-	LR 0,A
-	LI FC_AKOPN
-	LR 1,A
-	LIS 4
-	LR 2,A
-	PI FNBEG
-	LI AKCREAT
-	LR 0,A
-	PI FNPB
-	LI AKAPP
-	LR 0,A
-	PI FNPB
-	LI AKKEY
-	LR 0,A
-	PI FNPB
 	LI AKWRMOD
-	LR 0,A
-	PI FNPB
-	PI FNGO
+	LR 1,A
+	PI AKOPEN
+	OI 0
+	BNZ AKWX
 
 	LI FDEV
 	LR 0,A
@@ -196,7 +188,7 @@ AKWRITE: ENTER
 	PI FNFIX
 	PI FNGO
 	PI FNACK
-	LEAVE
+AKWX:	LEAVE
 
 ; ---------------------------------------------------------------------------
 ; SEDIT -- the on-screen keyboard.
