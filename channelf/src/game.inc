@@ -23,9 +23,17 @@
 ;      the reticle paints on every board that shot will reach.
 ;
 ; And a sixth this machine adds: NSETTLE's minimum length comes from GMINLN
-; run against the PREVIOUS poll's seat count, so the settle does not have to
-; guess. If the count shrank, VALID8 rejects the short reply and the next poll
-; retries with a lower floor.
+; run against the PREVIOUS poll's status and seat count, so the settle does not
+; have to guess. That floor is only a hint. A status change moves it the wrong
+; way as easily as a seat count: lobby -> place shrinks the reply from 59+10*pc
+; to 49+10*pc, and game over -> lobby from 49+115*pc to 59+10*pc, so the floor
+; is never met and the poll used to die with FF at both transitions. NSETTLE
+; therefore also accepts a reply of at least a header that has stopped growing
+; for a second, and VALID8 judges it against its OWN header.
+;
+; And a seventh: a failed poll is retried (SGRETRY), POLLTRY times, before the
+; error screen. The server's first reply to a new player waits on its own lobby
+; POST, and a reply that comes back late is no reason to throw the game away.
 ; ---------------------------------------------------------------------------
 
 ; --- queued cues ----------------------------------------------------------
@@ -53,6 +61,7 @@ TICKLOB	EQU 110			; lobby: ~2 s
 TICKPLC	EQU 55			; waiting on other players to place: ~1 s
 TICKPLY	EQU 80			; in play: ~1.5 s
 TICKOVR	EQU 170			; game over: ~3 s; the server restarts on its own
+POLLTRY	EQU 4			; failed polls in a row before the error screen
 TICKTURN EQU 4			; while it is your turn: straight back to aiming
 
 ; ---------------------------------------------------------------------------
@@ -71,6 +80,9 @@ SGAME:	ENTER
 	DCI VPEND
 	CLR
 	ST			; nothing staged: the first poll is a plain /state
+	DCI VFAILN
+	CLR
+	ST
 	DCI VBLINK
 	LIS 8
 	ST
@@ -109,16 +121,19 @@ SGPQ:	DCI VREQ		;   cleared VPEND then refetches the table list
 	BZ SGVAL
 	DCI VFAILC
 	ST
-	JMP FAIL
+	JMP SGRETRY
 
 SGVAL:	PI VALID8
 	OI 0
 	BZ SGHDR
 	DCI VFAILC
 	ST
-	JMP FAIL
+	JMP SGRETRY
 
-SGHDR:	PI GHDR
+SGHDR:	DCI VFAILN		; a good poll ends any run of failures
+	CLR
+	ST
+	PI GHDR
 	ENDIF
 
 	PI GCLASS
@@ -210,6 +225,28 @@ SGK2:	CI EV_SEL
 	ST
 	JMP SGPOLL
 SGK3:	JMP SGIDLE
+
+; ---------------------------------------------------------------------------
+; SGRETRY -- a poll failed. One bad reply is not the end of the game: the C
+;   client backs off and polls again, and so do we. Only POLLTRY failures in a
+;   row reach the error screen, with the code of the last one. A staged action
+;   was spent by the failed request, so the retry is a plain /state.
+; ---------------------------------------------------------------------------
+SGRETRY: DCI VFAILN
+	LM
+	INC
+	DCI VFAILN
+	ST
+	CI POLLTRY
+	BZ SGGIVE
+	LI 110			; ~1 s
+	LR 3,A
+	PI DELAYMS
+	JMP SGPOLL
+SGGIVE:	DCI VFAILN
+	CLR
+	ST
+	JMP FAIL
 
 ; ---------------------------------------------------------------------------
 ; GTICK -- how long to hold this picture before polling again.

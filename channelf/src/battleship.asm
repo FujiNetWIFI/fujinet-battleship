@@ -86,6 +86,8 @@ VMIN0	EQU 08028H		; the length the reply cannot be shorter than
 VMIN1	EQU 08029H
 VFAILC	EQU 0802AH		; failure code -- in RAM, because a draw routine
 				;   would have overwritten a register holding it
+VSTBL	EQU 0802BH		; settle: consecutive readings that did not move
+VFAILN	EQU 0802CH		; polls that failed in a row
 ; --- this poll's header ---
 VPC	EQU 08030H		; playerCount
 VST	EQU 08031H		; status

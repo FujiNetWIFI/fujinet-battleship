@@ -287,6 +287,17 @@ ENDPOINT=http://127.0.0.1:8080/ ./build.sh && make smoke
 Tables `ai1`..`ai3` always have bots; the list is High Seas, Cape Fuji, AI-3,
 AI-2, AI-1, so **"AI - 1 on 1" is the fifth row**.
 
+### Slow and shrinking replies
+
+* The settle floor comes from the previous poll's status, and a status change
+  can make the next reply *shorter* (lobby -> place, game over -> lobby).
+  `NSETTLE` also accepts a header-sized reply that has not grown for ~1 s;
+  `VALID8` then checks it against its own header. Before this the client
+  died with NET ERR FF the moment the game left the lobby.
+* The server posts to the lobby before it answers a new player's first
+  `/state`, which can take seconds. A failed poll is retried up to four times
+  (about a second apart) before the error screen.
+
 ### The harness traps
 
 * MAME's `machine.time.seconds` returns the **integer** second, so a script
