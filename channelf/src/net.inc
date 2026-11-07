@@ -93,6 +93,9 @@ NSTATUS: ENTER
 NSBAD:	LI 0FFH
 	LEAVE
 
+NSETTRY	EQU 200			; readings before giving up: ~20 s
+NSTABLE	EQU 10			; unchanged readings that make a short reply final
+
 ; NSETTLE -- poll STATUS until at least VMIN bytes are waiting AND two
 ;   consecutive readings agree, bounded.
 ;
@@ -103,7 +106,7 @@ NSBAD:	LI 0FFH
 ;   followed by 40 bytes of nothing. Waiting for a length the caller knows the
 ;   reply cannot be shorter than removes the guess.
 NSETTLE: ENTER
-	LI 60
+	LI NSETTRY
 	DCI VNTRY
 	ST
 	CLR
@@ -111,13 +114,17 @@ NSETTLE: ENTER
 	ST
 	DCI VPRVHI
 	ST
+	DCI VSTBL
+	ST
 NSET1:	PI NSTATUS
 	CI 0
-	BNZ NSETB
+	BZ NSET2
+	LI 0FFH			; STATUS itself failed (NSETB is out of BR's reach)
+	LEAVE
 
-	PI NCMPMIN		; avail >= min?
+NSET2:	PI NCMPMIN		; avail >= min?
 	CI 0
-	BNZ NSETN
+	BNZ NSHORT
 
 NSETC:	; enough has arrived; now require it to stop growing
 	DCI VAVLO
@@ -137,6 +144,48 @@ NSETC:	; enough has arrived; now require it to stop growing
 	CLR
 	LEAVE
 
+; NSHORT -- fewer bytes than the floor says. The floor is a GUESS, taken from
+;   the previous poll's status, and a status change can shrink the reply below
+;   it: game over -> lobby drops 279 bytes to 79, so waiting for 279 never ends
+;   and the poll dies with FF on a perfectly good reply. So a reading that has
+;   not moved for NSTABLE polls in a row, and holds at least a header, is the
+;   whole reply; VALID8 then checks it against its OWN header and rejects it if
+;   it really was cut short.
+NSHORT:	DCI VAVLO
+	LM
+	LR 4,A
+	DCI VPRVLO
+	LM
+	XS 4
+	BNZ NSHCH
+	DCI VAVHI
+	LM
+	LR 4,A
+	DCI VPRVHI
+	LM
+	XS 4
+	BNZ NSHCH
+	DCI VSTBL		; unchanged since the last reading
+	LM
+	INC
+	DCI VSTBL
+	ST
+	CI NSTABLE
+	BNZ NSETN
+	DCI VAVHI		; stable long enough: is there a header?
+	LM
+	OI 0
+	BNZ NSHOK
+	DCI VAVLO
+	LM
+	AI 256-GHDRLEN
+	BNC NSETN		; carry = avail >= GHDRLEN
+NSHOK:	CLR
+	LEAVE
+NSHCH:	DCI VSTBL
+	CLR
+	ST
+
 NSETN:	DCI VAVLO
 	LM
 	DCI VPRVLO
@@ -153,6 +202,10 @@ NSETN:	DCI VAVLO
 	; Passing 100 here asks for the best part of a second per reading and 54
 	; seconds of worst case, which is what a poll loop that managed three
 	; requests in ninety seconds was actually waiting on.
+	;
+	; NSETTRY of them is the whole budget: about 20 s, the HTTP client's own
+	; timeout. It has to be that long. In production the server POSTs the lobby
+	; BEFORE it replies to a join or a game's end, which takes seconds.
 	LI 11
 	LR 3,A
 	PI DELAYMS
@@ -162,7 +215,8 @@ NSETN:	DCI VAVLO
 	DCI VNTRY
 	ST
 	CI 0
-	BNZ NSET1
+	BZ NSETB
+	JMP NSET1		; out of BR's reach now
 NSETB:	LI 0FFH
 	LEAVE
 
