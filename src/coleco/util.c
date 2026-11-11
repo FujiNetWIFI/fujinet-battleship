@@ -12,12 +12,11 @@
 #include <string.h>
 #include <stdlib.h>
 #include <fujinet-fuji.h>
-#include <fujinet-coleco.h>
 #include "vars.h"
 #include "../platform-specific/graphics.h"
 #include "../platform-specific/util.h"
 
-// The firmware's WRITE HOST SLOTS expects all 8 slots.
+// READ HOST SLOTS returns all 8 slots.
 #define FUJI_HOST_SLOT_COUNT 8
 
 #define LOBBY_DEVICE_SLOT 0
@@ -141,19 +140,18 @@ static bool mountLobby(uint8_t slot)
                                   (char *)lobbyPath))
         return false;
 
-    // Only starts the transfer. The image is pushed to the cartridge
-    // asynchronously, after this has already been answered.
     return fuji_mount_disk_image(LOBBY_DEVICE_SLOT, LOBBY_MODE_READ) != 0;
 }
 
 void quit(void)
 {
-    uint8_t bootState, slot, pct = 0xFF;
+    uint8_t romState, slot, pct = 0xFF;
     char pctText[5];
+    FujiUserRomProgress progress;
 
     quitStatus("LOADING LOBBY...");
 
-    if (!fuji_coleco_present())
+    if (fuji_user_rom_status(&progress) == FUJI_USER_ROM_NO_CART)
     {
         quitStatus("NO FUJINET CARTRIDGE");
         return;
@@ -173,31 +171,27 @@ void quit(void)
     }
 
     // Watch the cartridge's own progress counter rather than guessing a delay.
-    for (;;)
+    while ((romState = fuji_user_rom_status(&progress)) == FUJI_USER_ROM_LOADING)
     {
-        bootState = fuji_coleco_boot_state();
-
-        if (bootState == FUJI_COLECO_BOOT_READY)
-            break;
-        if (bootState == FUJI_COLECO_BOOT_FAILED)
+        if (progress.percent != pct)
         {
-            quitStatus("LOBBY LOAD FAILED");
-            return;
-        }
-
-        if (fuji_coleco_boot_percent() != pct)
-        {
-            pct = fuji_coleco_boot_percent();
+            pct = progress.percent;
             itoa(pct, pctText, 10);
             strcat(pctText, "%");
             drawText(18, HEIGHT - 1, pctText);
         }
     }
 
+    if (romState != FUJI_USER_ROM_READY)
+    {
+        quitStatus("LOBBY LOAD FAILED");
+        return;
+    }
+
     // Stop the firmware serving CONFIG at boot, then hand the console over.
-    // The swap does not return: every byte of $8000-$FFFF changes underneath.
+    // It does not return: every byte of $8000-$FFFF changes underneath.
     fuji_set_boot_config(0);
-    fuji_coleco_boot_swap();
+    fuji_enable_user_rom();
 }
 
 #endif /* BUILD_COLECO */

@@ -5,7 +5,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <eos.h>
-#include "../../../src/fujinet-fuji.h"
+#include <fujinet-fuji.h>
 
 extern const uint8_t charsetPatterns[];
 extern const uint8_t charsetColors[];

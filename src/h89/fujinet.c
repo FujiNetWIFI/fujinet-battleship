@@ -7,12 +7,9 @@
  * @license gpl v. 3, see LICENSE for details
  *
  * Everything that talks to the H89 FujiNet card through fujinet-lib is in
- * this one file, because it has to see the LIBRARY's <fujinet-fuji.h>: the
- * h89 build of the lib implements the appkey calls as macros over its bus
- * call, so the prototypes in src/fujinet-fuji.h (which src/misc.h pulls in)
- * link against nothing. This file therefore includes none of the game's
- * headers, and the shared code reaches the card through the
- * CUSTOM_FUJINET_CALLS hooks instead. (src/sms/fujinet.c, less the lobby.)
+ * this one file: it includes the library's headers and none of the game's;
+ * the shared code reaches the card through the CUSTOM_FUJINET_CALLS hooks
+ * instead. (src/sms/fujinet.c, less the lobby.)
  */
 
 #include <stdbool.h>

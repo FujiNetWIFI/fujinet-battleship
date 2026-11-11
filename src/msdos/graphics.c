@@ -197,7 +197,7 @@ void plotName(unsigned char x, unsigned char y, unsigned char color, const char 
 }
 
 /**
- * @brief Clear screen to given color index
+ * @brief Clear screen
  */
 void resetScreen(void)
 {
@@ -209,7 +209,7 @@ void resetScreen(void)
 }
 
 /**
- * @brief cycle to next color palette
+ * @brief No palette cycling on MS-DOS
  */
 unsigned char cycleNextColor()
 {
@@ -362,14 +362,66 @@ void drawTextAlt(unsigned char x, unsigned char y, const char *s)
     }
 }
 
+/* Never time off the VGA retrace at 0x3DA: QEMU toggles the bit on every read,
+ * so polls fall through at once. Counter 0 is crystal driven and dependable on
+ * both. The BIOS mode varies - mode 3 drops the count by two per clock - so it
+ * is measured against the BIOS tick at 0040:006C, 18.2Hz whatever the mode. */
+unsigned int pitTicksPerMs = 0;
+
+unsigned int pitRead(void)
+{
+    unsigned int t;
+
+    outp(0x43, 0x00);                /* latch counter 0 */
+    t  = (unsigned int)inp(0x40);
+    t |= (unsigned int)inp(0x40) << 8;
+    return t;
+}
+
+void calibratePit(void)
+{
+    volatile unsigned long far *biosTick;
+    unsigned long units, mark;
+    unsigned int prev, now, perMs;
+
+    biosTick = (volatile unsigned long far *)MK_FP(0x40, 0x6C);
+
+    mark = *biosTick;
+    while (*biosTick == mark)        /* start on a fresh tick */
+        ;
+
+    mark = *biosTick;
+    units = 0;
+    prev = pitRead();
+    while (*biosTick == mark) {
+        now = pitRead();
+        units += (unsigned int)(prev - now);
+        prev = now;
+    }
+
+    perMs = (unsigned int)((units * 1000UL) / 54925UL);
+
+    /* ~1193 in mode 2, ~2386 in mode 3; anything else means it went wrong */
+    pitTicksPerMs = (perMs >= 900 && perMs <= 3000) ? perMs : 1193;
+}
+
 /**
- * @brief Wait for vertical sync, no more than 1/60th of a second.
+ * @brief Wait until 1/60th of a second after the previous call returned.
  */
 void waitvsync()
 {
-    // Wait until we are in vsync
-    while (! (inp(0x3DA) & 0x08));
-    while (inp(0x3DA) & 0x08);
+    static unsigned int last_pit = 0;
+    unsigned int now, frame;
+
+    if (!pitTicksPerMs)
+        calibratePit();
+
+    frame = (unsigned int)(((unsigned long)pitTicksPerMs * 50UL) / 3UL);  /* 16.67ms */
+
+    do {
+        now = pitRead();
+    } while ((unsigned int)(last_pit - now) < frame);
+    last_pit = now;
 }
 
 /**
