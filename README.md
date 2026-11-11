@@ -21,7 +21,7 @@ This is a WIP cross platform game client for the Fuji Battleships server.
 ### To Build
 1. Review/edit the Post Build and the emulator start commands in `Makefile`
 2. To build and test: `make [platform]`
-3. Platforms: **apple2** **atari** **adam** **coco*** **dragon** **msdos** **nes** **coleco** **model2** **c64***
+3. Platforms: **apple2** **atari** **adam** **coco*** **dragon** **msdos** **nes** **coleco** **h89-cpm** **h89-hdos** **model2** **c64***
 
 ### C64
 To test in VICE, run support/c64/fuji_mock_network.py and make as follows:
@@ -57,8 +57,8 @@ Controls: d-pad moves, 1 selects/fires/readies, 2 refreshes/rotates, Pause opens
 
 ### Heathkit H89
 Built with z88dk (`zcc +hdos` / `zcc +cpm`). Both builds share `src/h89`:
-* HDOS: `make PLATFORMS=h89-hdos h89-hdos` makes `r2r/h89-hdos/fbs.abs`, and `fbs.h8d`, a 100K H17 disk holding `FBS.ABS`: `MOUNT SY1:` then `RUN SY1:FBS.ABS`
-* CP/M: `make PLATFORMS=h89-cpm h89-cpm` makes `r2r/h89-cpm/fbs.com`, and `fbs.h8d`, an H17 disk holding `FBS.COM`: `B:FBS`
+* HDOS: `make h89-hdos` makes `r2r/h89-hdos/fbs.abs`, and `fbs.h8d`, a 100K H17 disk holding `FBS.ABS`: `MOUNT SY1:` then `RUN SY1:FBS.ABS`
+* CP/M: `make h89-cpm` makes `r2r/h89-cpm/fbs.com`, and `fbs.h8d`, an H17 disk holding `FBS.COM`: `B:FBS`
 
 The disks need z88dk's `z88dk-appmake` on the PATH. The game draws on the H19 terminal in 80x24 with its graphics characters, reverse video and cursor addressing, and sends only what changes on screen, since the console runs at 9600 baud. Test it in FujiNet Go H89 (`~/Workspace/fujinet-go-h89-desktop`), with the disk in drive 2 beside its HDOS 2.0 or 64K CP/M boot disk.
 

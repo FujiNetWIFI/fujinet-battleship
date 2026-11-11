@@ -32,7 +32,7 @@ endef
 
 PRODUCT = fbs
 PRODUCT_UPPER = FBS
-PLATFORMS = coco atari apple2 adam dragon msdos nes coleco model2
+PLATFORMS = coco atari apple2 adam dragon msdos nes coleco h89-cpm h89-hdos model2
 # Cannot currently build against fujinet-lib.
 #PLATFORMS += sms atari7800 atari5200
 # TODO: c64 (builds, not playable yet), msxrom (needs a src/msxrom port)
@@ -113,9 +113,8 @@ LDFLAGS_EXTRA_SMS += -m \
   -pragma-define:CLIB_EXIT_STACK_SIZE=0
 
 ## Heathkit H89 (z88dk +hdos / +cpm, H89 FujiNet card on the 8255 at 0xD0).
-## Not in PLATFORMS; build with
-##   make PLATFORMS=h89-hdos h89-hdos      HDOS:  r2r/h89-hdos/fbs.abs + fbs.h8d
-##   make PLATFORMS=h89-cpm h89-cpm        CP/M:  r2r/h89-cpm/fbs.com + fbs.h8d
+##   make h89-hdos      HDOS:  r2r/h89-hdos/fbs.abs + fbs.h8d
+##   make h89-cpm       CP/M:  r2r/h89-cpm/fbs.com + fbs.h8d
 ## Both builds share src/h89 through the combos below, and src/h89 is guarded
 ## by __H89__ (which both platform .mk files define; the lib keys on it too).
 ## The game draws on the H19 terminal with its graphics characters and escape
@@ -125,8 +124,8 @@ PLATFORM_COMBOS += h89-cpm+=h89 h89-hdos+=h89
 ifneq ($(filter h89-cpm h89-hdos,$(PLATFORM)),)
   CFLAGS =
 endif
-CFLAGS_EXTRA_H89-CPM = -DCUSTOM_FUJINET_CALLS -O3
-CFLAGS_EXTRA_H89-HDOS = -DCUSTOM_FUJINET_CALLS -O3
+CFLAGS_EXTRA_H89_CPM = -DCUSTOM_FUJINET_CALLS -O3
+CFLAGS_EXTRA_H89_HDOS = -DCUSTOM_FUJINET_CALLS -O3
 # No stdio or file handles: the game talks to the console itself
 # (src/h89/console.c). -m leaves the map beside the program so the end of BSS
 # can be checked against the OS's top of memory.
@@ -136,8 +135,8 @@ H89_LDFLAGS = -m \
   -pragma-define:CLIB_OPEN_MAX=0 \
   -pragma-define:CLIB_EXIT_STACK_SIZE=0 \
   -pragma-define:CRT_ENABLE_COMMANDLINE=0
-LDFLAGS_EXTRA_H89-CPM = $(H89_LDFLAGS)
-LDFLAGS_EXTRA_H89-HDOS = $(H89_LDFLAGS)
+LDFLAGS_EXTRA_H89_CPM = $(H89_LDFLAGS)
+LDFLAGS_EXTRA_H89_HDOS = $(H89_LDFLAGS)
 H89_APPMAKE ?= z88dk-appmake
 
 ## TRS-80 Model II (z88dk +cpm, Pickles & Trout CP/M): r2r/model2/fbs.imd.
