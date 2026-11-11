@@ -3,10 +3,10 @@
 */
 
 #include <stdint.h>
+#include <fujinet-fuji.h>
 #include "../platform-specific/util.h"
 
 void hires_Done(void);
-void prodosQuit(void);
 
 // External counter defined in waitvsync.s
 extern uint16_t vsyncCounter;
@@ -21,7 +21,11 @@ uint16_t getTime() {
 
 void quit() {
     hires_Done();
-    prodosQuit();
+    fuji_set_boot_mode(FUJI_BOOT_MODE_LOBBY);
+    // ROM in, then spoil the reset vector's checksum so the reset is a cold boot
+    __asm__ ("bit $c082");
+    __asm__ ("dec $03f4");
+    __asm__ ("jmp ($fffc)");
 }
 
 void housekeeping() {

@@ -1,5 +1,5 @@
 #include <coco.h>
-#include "fujinet-fuji.h"
+#include <fujinet-fuji.h>
 
 #define JOY_CENTER   31
 #define JOY_HALF     16

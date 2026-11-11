@@ -12,7 +12,6 @@
 #include <fujinet-fuji.h>
 #include "vars.h"
 
-static uint8_t initialized = 0;
 static uint8_t channelOpen = 0;
 
 /*
@@ -35,13 +34,6 @@ static uint8_t channelOpen = 0;
 */
 int16_t custom_network_call(char *url, uint8_t *buffer, uint16_t max_len)
 {
-    if (!initialized)
-    {
-        if (network_init() != FN_ERR_OK)
-            return -1;
-        initialized = 1;
-    }
-
     // The url handed in is the next request's, not the one that was opened,
     // but every url this client builds carries the bare "n:" prefix and so
     // resolves to the same network unit.

@@ -6,13 +6,10 @@
  * @email   thom dot cherryhomes at gmail dot com
  * @license gpl v. 3, see LICENSE for details
  *
- * Everything that talks to the cartridge through fujinet-lib-experimental is
- * in this one file, because it has to see the LIBRARY's <fujinet-fuji.h>:
- * the nes target implements most fuji_* calls as macros over its bus call,
- * so the prototypes in src/fujinet-fuji.h (which src/misc.h and the platform
- * headers pull in) link against nothing. This file therefore includes none
- * of the game's headers, and the shared code reaches the cartridge through
- * the CUSTOM_FUJINET_CALLS hooks instead.
+ * Everything that talks to the cartridge through fujinet-lib is in this one
+ * file: it includes the library's headers and, of the game's, only vars.h;
+ * the shared code reaches the cartridge through the CUSTOM_FUJINET_CALLS
+ * hooks instead.
  */
 
 #include <stdbool.h>
@@ -21,15 +18,14 @@
 #include <stdlib.h>
 #include <fujinet-fuji.h>
 #include <fujinet-network.h>
-#include <fujinet-nes.h>
 #include "vars.h"
 
 // graphics.c - declared here rather than through ../platform-specific, which
-// would bring in src/fujinet-fuji.h
+// would bring in the game's headers
 void drawText(uint8_t x, uint8_t y, const char *s);
 void drawSpace(uint8_t x, uint8_t y, uint8_t w);
 
-// The firmware's WRITE HOST SLOTS expects all 8 slots.
+// READ HOST SLOTS returns all 8 slots.
 #define FUJI_HOST_SLOT_COUNT 8
 #define LOBBY_DEVICE_SLOT 0
 #define LOBBY_MODE_READ 1
@@ -114,19 +110,19 @@ static bool mountLobby(uint8_t slot)
     if (!fuji_set_device_filename(LOBBY_MODE_READ, slot, LOBBY_DEVICE_SLOT,
                                   (char *)lobbyPath))
         return false;
-    // Only starts the transfer. The image is pushed to the cartridge
-    // asynchronously, after this has already been answered.
+    // Returns once the whole image is on the cart.
     return fuji_mount_disk_image(LOBBY_DEVICE_SLOT, LOBBY_MODE_READ) != 0;
 }
 
 void quit(void)
 {
-    uint8_t bootState, slot, pct = 0xFF;
+    uint8_t romState, slot, pct = 0xFF;
     char pctText[5];
+    FujiUserRomProgress progress;
 
     quitStatus("LOADING LOBBY...");
 
-    if (!fuji_nes_present())
+    if (fuji_user_rom_status(&progress) == FUJI_USER_ROM_NO_CART)
     {
         quitStatus("NO FUJINET CARTRIDGE");
         return;
@@ -146,29 +142,27 @@ void quit(void)
     }
 
     // Watch the cartridge's own progress counter rather than guessing a delay.
-    for (;;)
+    while ((romState = fuji_user_rom_status(&progress)) == FUJI_USER_ROM_LOADING)
     {
-        bootState = fuji_nes_boot_state();
-        if (bootState == FUJI_NES_BOOT_READY)
-            break;
-        if (bootState == FUJI_NES_BOOT_FAILED)
+        if (progress.percent != pct)
         {
-            quitStatus("LOBBY LOAD FAILED");
-            return;
-        }
-        if (fuji_nes_boot_percent() != pct)
-        {
-            pct = fuji_nes_boot_percent();
+            pct = progress.percent;
             itoa(pct, pctText, 10);
             strcat(pctText, "%");
             drawText(18, HEIGHT - 1, pctText);
         }
     }
 
+    if (romState != FUJI_USER_ROM_READY)
+    {
+        quitStatus("LOBBY LOAD FAILED");
+        return;
+    }
+
     // Stop the firmware serving CONFIG at boot, then hand the console to the
     // cartridge's loader ROM. It does not return.
     fuji_set_boot_config(0);
-    fuji_nes_boot();
+    fuji_enable_user_rom();
 }
 
 #endif /* BUILD_NES */

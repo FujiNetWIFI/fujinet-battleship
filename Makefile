@@ -7,8 +7,6 @@
 #################################################################
 
 # TO BUILD: 		make <platform>
-# PLATFORMS: 		apple2 atari coco coco3 msdos dragon
-# PLATFORMS TODO:   c64 adam msxrom
 
 # C64 SPECIFIC:
 # To test in VICE:  make c64 VICE=1
@@ -34,20 +32,20 @@ endef
 
 PRODUCT = fbs
 PRODUCT_UPPER = FBS
-PLATFORMS = coco atari apple2 c64 adam dragon
+PLATFORMS = coco atari apple2 adam dragon msdos nes coleco
+# Cannot currently build against fujinet-lib.
+#PLATFORMS += sms atari7800 atari5200
+# TODO: c64 (builds, not playable yet), msxrom (needs a src/msxrom port)
 
 PLATFORM_COMBOS = \
   dragon+=coco
-
-# Use "make-exp msdos" to build msdos.
-# That version uses fujinet-lib-experimental.
 
 # SRC_DIRS may use the literal %PLATFORM% token.
 # It expands to the chosen PLATFORM plus any of its combos.
 SRC_DIRS = src src/%PLATFORM%
 
-# FUJINET_LIB - specify version such as 4.7.6, or leave empty for latest
-FUJINET_LIB = 4.8.2
+# FUJINET_LIB - a version such as 4.7.6, a directory, a git URL, or empty for latest
+FUJINET_LIB = https://github.com/FujiNetWIFI/fujinet-lib.git
 
 ## Compiler / Linker flags                                     ##
 #################################################################
@@ -60,23 +58,13 @@ ifeq ($(PLATFORM),msdos)
   CFLAGS =
 endif
 
-## Adam (z88dk) - same vars.h hack; build against the local fujinet-lib tree
+## Adam (z88dk) - same vars.h hack
 ifeq ($(PLATFORM),adam)
   CFLAGS =
-  FUJINET_LIB = ../fujinet-lib/build
 endif
 LDFLAGS_EXTRA_ADAM = -m
 
-## C64 - fujinet-lib 5 speaks the current IEC protocol (FujiIECPacket, unified N:).
-## Its API differs from the 4.x headers in src, so the C64 includes the lib's own.
-ifeq ($(PLATFORM),c64)
-  FUJINET_LIB = 5.0.0
-endif
-
-## ColecoVision (z88dk +coleco, FujiNet mailbox cartridge). Not in PLATFORMS:
-## the coleco bus is in fujinet-lib itself (FujiNetWIFI/fujinet-lib#281, branch
-## add-coleco), no longer in fujinet-lib-experimental, so build with
-##   make FUJINET_LIB=<that lib's checkout> PLATFORMS=coleco coleco
+## ColecoVision (z88dk +coleco, FujiNet mailbox cartridge).
 ## z88dk puts -D__COLECO__ in the target-wide OPTIONS line, so the Adam
 ## subtype defines it too -- __COLECO__ alone does not mean ColecoVision.
 ## src/coleco is therefore guarded by BUILD_COLECO.
@@ -98,10 +86,7 @@ LDFLAGS_EXTRA_COLECO += -m \
   -pragma-define:CLIB_EXIT_STACK_SIZE=0 \
   -pragma-define:CLIB_DEFAULT_SCREEN_MODE=-1
 
-## NES (cc65, FujiNet mailbox cartridge). Not in PLATFORMS: like the
-## ColecoVision it needs fujinet-lib-experimental -- and the add-nes branch of
-## it, the only one with the nes bus -- so build with
-##   make nes FUJINET_LIB=$(HOME)/Workspace/fujinet-lib-experimental
+## NES (cc65, FujiNet mailbox cartridge).
 ## src/nes is guarded by BUILD_NES the way src/coleco is. The linker config is
 ## the lib's FujiNet layout with the CHR-ROM split so the game's own pattern
 ## table (src/nes/chr.s, from the msdos art) sits at $1000 beside the cc65 font
@@ -110,14 +95,11 @@ CFLAGS_EXTRA_NES = -DBUILD_NES -DCUSTOM_FUJINET_CALLS -Os
 NES_CFG = src/nes/nes.cfg
 
 ## Sega Master System (z88dk +sms, FujiNet mailbox cartridge). Not in
-## PLATFORMS: the sms bus lives on the add-sms branch of
-## fujinet-lib-experimental (a worktree of it at ~/Workspace/fnlib-sms), so
-## build with
-##   make PLATFORMS=sms sms FUJINET_LIB=$(HOME)/Workspace/fnlib-sms
+## PLATFORMS: fujinet-lib has no sms bus.
 ## src/sms is guarded by BUILD_SMS the way src/coleco is, and gets the same
 ## vars.h quoting hack. The image is a flat 32K: mekkogx/sms-romstamp.py stamps
 ## the "FUJI" claim at $7FDC and keeps $7FD8-$7FEF clear for it. The art is the
-## CoCo 3's 16-colour sheet, which src/sms/mktiles.py turns into Mode 4 tiles.
+## CoCo 3's 16-color sheet, which src/sms/mktiles.py turns into Mode 4 tiles.
 ifeq ($(PLATFORM),sms)
   CFLAGS =
 endif
@@ -131,8 +113,7 @@ LDFLAGS_EXTRA_SMS += -m \
   -pragma-define:CLIB_EXIT_STACK_SIZE=0
 
 ## Heathkit H89 (z88dk +hdos / +cpm, H89 FujiNet card on the 8255 at 0xD0).
-## Not in PLATFORMS: the h89 bus is on the h89-support branch of fujinet-lib
-## (checked out at ~/Workspace/fujinet-lib), so build with
+## Not in PLATFORMS; build with
 ##   make PLATFORMS=h89-hdos h89-hdos      HDOS:  r2r/h89-hdos/fbs.abs + fbs.h8d
 ##   make PLATFORMS=h89-cpm h89-cpm        CP/M:  r2r/h89-cpm/fbs.com + fbs.h8d
 ## Both builds share src/h89 through the combos below, and src/h89 is guarded
@@ -143,7 +124,6 @@ LDFLAGS_EXTRA_SMS += -m \
 PLATFORM_COMBOS += h89-cpm+=h89 h89-hdos+=h89
 ifneq ($(filter h89-cpm h89-hdos,$(PLATFORM)),)
   CFLAGS =
-  FUJINET_LIB = $(HOME)/Workspace/fujinet-lib
 endif
 CFLAGS_EXTRA_H89-CPM = -DCUSTOM_FUJINET_CALLS -O3
 CFLAGS_EXTRA_H89-HDOS = -DCUSTOM_FUJINET_CALLS -O3
@@ -160,19 +140,15 @@ LDFLAGS_EXTRA_H89-CPM = $(H89_LDFLAGS)
 LDFLAGS_EXTRA_H89-HDOS = $(H89_LDFLAGS)
 H89_APPMAKE ?= z88dk-appmake
 
-## Atari 7800 (cc65, FujiNet 7800 cartridge). Not in PLATFORMS: it needs the
-## add-atari7800 branch of fujinet-lib-experimental, the only lib with the
-## atari7800 bus, so build with
-##   make PLATFORMS=atari7800 atari7800 FUJINET_LIB=<that checkout>
+## Atari 7800 (cc65, FujiNet 7800 cartridge). Not in PLATFORMS: fujinet-lib
+## has no atari7800 bus.
 ## src/atari7800 is guarded by BUILD_ATARI7800 the way src/nes is. The screen
 ## is the shared MARIA engine (src/atari7800/maria.s), its 128 tiles made from
 ## the msdos art by src/atari7800/mkchr.py.
 CFLAGS_EXTRA_ATARI7800 = -DBUILD_ATARI7800 -DCUSTOM_FUJINET_CALLS -Os
 
-## Atari 5200 (cc65, FujiNet 5200 cartridge). Not in PLATFORMS: it needs the
-## atari5200 target of fujinet-lib-experimental, the only lib with the
-## atari5200 bus and its crt0, so build with
-##   make PLATFORMS=atari5200 atari5200 FUJINET_LIB=<that checkout>
+## Atari 5200 (cc65, FujiNet 5200 cartridge). Not in PLATFORMS: src/atari5200
+## calls fuji_a5200_*, which fujinet-lib does not export to clients.
 ## src/atari5200 is guarded by BUILD_ATARI5200 the way src/atari7800 is. The
 ## screen is the Atari 8-bit's (src/atari), moved out of the cart window: the
 ## top 4K of RAM holds its charset copy, screen and player graphics
@@ -191,9 +167,19 @@ ifeq ($(MAKE_COCO3),COCO3)
 # 	Coco 3
 	CFLAGS_EXTRA_COCO += -DCOCO3
 	LDFLAGS_EXTRA_COCO = --limit=7800 --org=$(COCO_ORG)
+	COCO_FLAVOR = coco3
 else
-# 	Coco 1/2	
+# 	Coco 1/2
 	LDFLAGS_EXTRA_COCO = --limit=5ff0 --org=$(COCO_ORG)
+	COCO_FLAVOR = coco12
+endif
+
+# Coco 1/2 and Coco 3 share one object dir: wipe it when switching between them.
+COCO_OBJ_DIR = build/$(PRODUCT)/coco
+ifeq ($(PLATFORM),coco)
+  ifneq ($(shell cat $(COCO_OBJ_DIR)/.flavor 2>/dev/null),$(COCO_FLAVOR))
+    $(shell rm -rf $(COCO_OBJ_DIR) && mkdir -p $(COCO_OBJ_DIR) && echo $(COCO_FLAVOR) > $(COCO_OBJ_DIR)/.flavor)
+  endif
 endif
 
 ## Dragon specific flags (cmoc)
@@ -242,8 +228,7 @@ $(PLATFORM)/r2r::
 
 #	Delete charset objects so every build gets the latest charset
 #	from /support/[platform] without needing to clean.
-	rm -f build/$(PLATFORM)/charset.o
-	rm -f build/$(PLATFORM)/hires.o
+	rm -f $(OBJ_DIR)/src/*/charset.o $(OBJ_DIR)/src/*/hires.o
 
 #   COLECO ONLY - regenerate the charset from the msdos art
 ifeq ($(PLATFORM),coleco)
@@ -554,8 +539,8 @@ coco-dist:
 # Create the disk with the loader and both versions of the program
 	$(RM) $(COCO_DISK)
 	decb dskini $(COCO_DISK)
-	echo RUNM\"$(PRODUCT_UPPER)\" > build/coco/autoexec.bas
-	decb copy -t -0 build/coco/autoexec.bas $(COCO_DISK),AUTOEXEC.BAS
+	echo RUNM\"$(PRODUCT_UPPER)\" > $(BUILD_DIR)/$(PRODUCT)/coco/autoexec.bas
+	decb copy -t -0 $(BUILD_DIR)/$(PRODUCT)/coco/autoexec.bas $(COCO_DISK),AUTOEXEC.BAS
 	writecocofile $(COCO_DISK) $(R2R_PRODUCT).bin
 	writecocofile $(COCO_DISK) $(R2R_PRODUCT)12.bin
 	writecocofile $(COCO_DISK) $(R2R_PRODUCT)3.bin

@@ -1,7 +1,7 @@
 
 #include <coco.h>
-#include "../fujinet-fuji.h"
-#include "../fujinet-network.h"
+#include <fujinet-fuji.h>
+#include <fujinet-network.h>
 #include "../platform-specific/graphics.h"
 
 
@@ -23,7 +23,7 @@ uint16_t getTime()
 
 /// @brief Invokes the CoCo BASIC RUNM command
 /// @param filename
-void runm(char *filename)
+void runm(const char *filename)
 {
     // This reproduces the state when executing RUNM"FILE in BASIC
     // by filling in the command line buffer and jumping directly
@@ -52,9 +52,8 @@ void runm(char *filename)
 void mount()
 {
     static uint8_t i, slot;
-    char host[] = "ec.tnfs.io";
-    char filename[] = "coco/lobby.dsk";
-    char file[] = "LOBBY";
+    const char *host = "ec.tnfs.io";
+    const char *filename = "coco/lobby.dsk";
 
     // Read current list of hosts from FujiNet
     fuji_get_host_slots((uint8_t *)host_slots, FUJI_HOST_SLOT_COUNT);
@@ -92,7 +91,7 @@ void mount()
 
     // Load the lobby
     waitvsync();
-    runm(file);
+    runm("LOBBY");
 }
 
 void quit()

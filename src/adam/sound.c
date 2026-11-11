@@ -5,7 +5,7 @@
   POKEY-style (voice, frequency, distortion, volume) interface and converts:
     - frequency: POKEY 64kHz divisor f -> SN tone period N = 7*(f+1)/2
       (63921/(2*(f+1)) Hz == 3579545/(32*N) Hz)
-    - volume 0-15 -> SN attenuation 15-vol
+    - volume 0-15 (POKEY, linear) -> SN attenuation (2dB steps) via volAtten
     - distortion 10 = pure tone on the requested voice; anything else runs
       the noise channel clocked by tone generator 2 so pitch sweeps carry
       over (mode 0xE7 = white noise, rate from tone 2)
@@ -16,6 +16,9 @@
 #define SN_PORT 0xFF
 
 static uint8_t noiseMode = 0;
+
+// round(10*log10(15/vol))
+static const uint8_t volAtten[16] = {15, 12, 9, 7, 6, 5, 4, 3, 3, 2, 2, 1, 1, 1, 0, 0};
 
 static void snw(uint8_t b)
 {
@@ -62,7 +65,7 @@ static void sound(uint8_t voice, uint8_t frequency, uint8_t distortion, uint8_t 
     if (distortion == 10)
     {
         tone(voice, n);
-        vol(voice, 15 - volume);
+        vol(voice, volAtten[volume & 15]);
     }
     else
     {
@@ -73,7 +76,7 @@ static void sound(uint8_t voice, uint8_t frequency, uint8_t distortion, uint8_t 
             noiseMode = 0xE7;
             snw(noiseMode);
         }
-        vol(3, 15 - volume);
+        vol(3, volAtten[volume & 15]);
     }
 }
 

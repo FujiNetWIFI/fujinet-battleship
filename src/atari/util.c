@@ -3,7 +3,7 @@
 #include <atari.h>
 
 #include "../misc.h"
-#include "../fujinet-fuji.h"
+#include <fujinet-fuji.h>
 #include "../platform-specific/graphics.h"
 
 void resetTimer()
