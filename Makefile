@@ -32,7 +32,7 @@ endef
 
 PRODUCT = fbs
 PRODUCT_UPPER = FBS
-PLATFORMS = coco atari apple2 adam dragon msdos nes coleco
+PLATFORMS = coco atari apple2 adam dragon msdos nes coleco model2
 # Cannot currently build against fujinet-lib.
 #PLATFORMS += sms atari7800 atari5200
 # TODO: c64 (builds, not playable yet), msxrom (needs a src/msxrom port)
@@ -139,6 +139,15 @@ H89_LDFLAGS = -m \
 LDFLAGS_EXTRA_H89-CPM = $(H89_LDFLAGS)
 LDFLAGS_EXTRA_H89-HDOS = $(H89_LDFLAGS)
 H89_APPMAKE ?= z88dk-appmake
+
+## TRS-80 Model II (z88dk +cpm, Pickles & Trout CP/M): r2r/model2/fbs.imd.
+## The H89's board and no-stdio link, drawn through the P&T video driver.
+ifeq ($(PLATFORM),model2)
+  CFLAGS =
+endif
+CFLAGS_EXTRA_MODEL2 = -DCUSTOM_FUJINET_CALLS -O3
+# CRT_TRIM_BSS leaves BSS out of the .com, so less loads over the bus
+LDFLAGS_EXTRA_MODEL2 = $(H89_LDFLAGS) -pragma-define:CRT_TRIM_BSS=1
 
 ## Atari 7800 (cc65, FujiNet 7800 cartridge). Not in PLATFORMS: fujinet-lib
 ## has no atari7800 bus.

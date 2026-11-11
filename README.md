@@ -12,6 +12,7 @@ This is a WIP cross platform game client for the Fuji Battleships server.
 * **NES** (FujiNet NES cartridge)
 * **ColecoVision** (FujiNet ColecoVision cartridge)
 * **Heathkit H89** (H89 FujiNet card; HDOS and CP/M)
+* **TRS-80 Model II** (Pickles & Trout CP/M)
 * **C64** (WIP)
 * **Sega Master System**, **Atari 7800**, **Atari 5200** (FujiNet cartridges; not currently building)
 * **Odyssey 2 / Videopac** (FujiNet O2 cartridge): see [o2/README.md](o2/README.md)
@@ -20,7 +21,7 @@ This is a WIP cross platform game client for the Fuji Battleships server.
 ### To Build
 1. Review/edit the Post Build and the emulator start commands in `Makefile`
 2. To build and test: `make [platform]`
-3. Platforms: **apple2** **atari** **adam** **coco*** **dragon** **msdos** **nes** **coleco** **c64***
+3. Platforms: **apple2** **atari** **adam** **coco*** **dragon** **msdos** **nes** **coleco** **model2** **c64***
 
 ### C64
 To test in VICE, run support/c64/fuji_mock_network.py and make as follows:
@@ -62,6 +63,11 @@ Built with z88dk (`zcc +hdos` / `zcc +cpm`). Both builds share `src/h89`:
 The disks need z88dk's `z88dk-appmake` on the PATH. The game draws on the H19 terminal in 80x24 with its graphics characters, reverse video and cursor addressing, and sends only what changes on screen, since the console runs at 9600 baud. Test it in FujiNet Go H89 (`~/Workspace/fujinet-go-h89-desktop`), with the disk in drive 2 beside its HDOS 2.0 or 64K CP/M boot disk.
 
 Controls: the keypad arrows (or `,` `.` `-` `=`) move, SPACE or RETURN selects/fires/readies, `R` refreshes/rotates, ESC (or f1-f5) opens the in-game menu, and `H`, `N`, `S` and `Q` are help, name, sound and quit. Quitting returns to HDOS or CP/M.
+
+### TRS-80 Model II
+Built with z88dk (`zcc +cpm`) for Pickles & Trout CP/M, from `src/model2`: `make model2` makes `r2r/model2/fbs.imd`, an 8" disk holding `FBS.COM`: `B:FBS`. It is the H89's 80x24 board, drawn with the Model II's graphics characters and reverse video.
+
+Controls: the arrows (or `,` `.` `-` `=`, or F1/F2 for up/down) move, SPACE or ENTER selects/fires/readies, `R` refreshes/rotates, ESC or BREAK opens the in-game menu, and `H`, `N` and `Q` are help, name and quit. There is no sound: the Model II has no speaker. Quitting loads the Model II lobby.
 
 ### Atari 7800
 Does not currently build: fujinet-lib has no 7800 bus. Built with cc65 (the linker config and romstamp are in `mekkogx/`):

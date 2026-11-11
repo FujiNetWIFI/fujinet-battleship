@@ -44,6 +44,48 @@
 #define LOGO_Y 1
 #endif
 
+#ifdef MIXED_CASE
+static char nameBuffer[21];
+
+const char *roomName(const char *name)
+{
+    uint8_t i;
+
+    for (i = 0; i < sizeof(nameBuffer) - 1 && name[i]; i++)
+        nameBuffer[i] = (name[i] >= 'a' && name[i] <= 'z') ? name[i] - 32 : name[i];
+    nameBuffer[i] = 0;
+    return nameBuffer;
+}
+
+const char *playerLabel(const char *name)
+{
+    uint8_t i;
+    bool start = true;
+
+    // The server lowers the case of names: show this player's as entered
+    if (!stricmp(name, playerName))
+        return playerName;
+
+    // Only the computer players' names end in " bot"
+    i = (uint8_t)strlen(name);
+    if (i < 4 || strcmp(name + i - 4, " bot"))
+        return name;
+
+    for (i = 0; i < sizeof(nameBuffer) - 1 && name[i]; i++)
+    {
+        nameBuffer[i] = (start && name[i] >= 'a' && name[i] <= 'z') ? name[i] - 32 : name[i];
+        start = name[i] == ' ';
+    }
+    nameBuffer[i] = 0;
+    return nameBuffer;
+}
+
+// Room names are all capitals, which drawTextAlt() would show as emphasis
+#define drawRoomNameAlt drawText
+#else
+#define drawRoomNameAlt drawTextAlt
+#endif
+
 bool inBorderedScreen = false, prevBorderedScreen = false, savedScreen = false;
 
 bool saveScreen()
@@ -72,7 +114,7 @@ void showHelpScreen()
 
     resetScreen();
 
-    drawTextAlt(WIDTH / 2 - 14, 1, "how to play FUJI BATTLESHIP");
+    drawTextAlt(WIDTH / 2 - 14, 1, TXT("how to play FUJI BATTLESHIP", "How to play FUJI BATTLESHIP"));
     drawLine(WIDTH / 2 - 16, 2, 31);
     y = 3;
 
@@ -87,25 +129,25 @@ void showHelpScreen()
 
     y++;
     y++;
-    drawTextAlt(X, y, "player starts with FIVE ships,");
+    drawTextAlt(X, y, TXT("player starts with FIVE ships,", "Players start with FIVE ships,"));
     y++;
     drawTextAlt(X, y, "taking turns attacking until");
     y++;
     drawTextAlt(X, y, "only ONE player remains.");
     y++;
     y++;
-    drawTextAlt(X, y, "when you attack a location, ALL");
+    drawTextAlt(X, y, TXT("when you attack a location, ALL", "When you attack a location, ALL"));
     y++;
     drawTextAlt(X, y, "ENEMY players are attacked.");
 
     y++;
     y++;
     y++;
-    drawTextAlt(X, y, "use your strategy and luck to");
+    drawTextAlt(X, y, TXT("use your strategy and luck to", "Use your strategy and luck to"));
     y++;
     drawTextAlt(X, y, "be the last player standing!");
 
-    centerStatusText("press any key to close");
+    centerStatusText(TXT("press any key to close", "Press any key to close"));
 
     clearCommonInput();
     cgetc();
@@ -138,7 +180,7 @@ void welcomeActionVerifyServerDetails()
 void drawLogo()
 {
     drawBox(WIDTH / 2 - 8, 0, 15, 1);
-    drawTextAlt(WIDTH / 2 - 7, LOGO_Y, "FUJI battleship");
+    drawTextAlt(WIDTH / 2 - 7, LOGO_Y, TXT("FUJI battleship", "FUJI Battleship"));
 
 }
 
@@ -183,6 +225,7 @@ void welcomeActionVerifyPlayerName()
         showPlayerNameScreen();
     }
 
+#ifndef MIXED_CASE
     // Convert to lowercase
     ptr = playerName;
     while (*ptr)
@@ -191,6 +234,7 @@ void welcomeActionVerifyPlayerName()
             *ptr += 32;
         ptr++;
     }
+#endif
 }
 
 /// @brief Shows the Welcome Screen with Logo. Asks player's name
@@ -233,7 +277,7 @@ void showTableSelectionScreen()
     {
         // Show names of local player(s)
 
-        strcpy(tempBuffer, "HELLO ");
+        strcpy(tempBuffer, TXT("HELLO ", "Hello "));
         strcat(tempBuffer, playerName);
         centerTextAlt(20, tempBuffer);
 
@@ -245,13 +289,13 @@ void showTableSelectionScreen()
             }
         }
         waitvsync();
-        centerText(12, "      refreshing game list..      ");
+        centerText(12, TXT("      refreshing game list..      ", "      Refreshing game list..      "));
 
         drawLogo();
 
-        centerText(4, "choose a game to join");
-        drawText(LMAR, 7, "game");
-        drawText(RMAR - 7, 7, "players");
+        centerText(4, TXT("choose a game to join", "Choose a game to join"));
+        drawText(LMAR, 7, TXT("game", "Game"));
+        drawText(RMAR - 7, 7, TXT("players", "Players"));
         drawLine(LMAR, 8, TWID);
 
         // waitvsync();
@@ -267,7 +311,7 @@ void showTableSelectionScreen()
             {
                 table = &clientState.tables.table[i];
                 j = 9 + i * 2;
-                drawTextAlt(LMAR, j, table->name);
+                drawRoomNameAlt(LMAR, j, roomName(table->name));
                 drawTextAlt(RMAR - 5, j, table->players);
 
                 if (table->players[0] > '0')
@@ -279,7 +323,7 @@ void showTableSelectionScreen()
         }
         else
         {
-            centerText(12, "no servers are available");
+            centerText(12, TXT("no servers are available", "No servers are available"));
         }
 
         centerStatusText(TABLE_STATUS_TEXT);
@@ -332,6 +376,7 @@ void showTableSelectionScreen()
                 break;
 #endif
             }
+#ifndef NO_SOUND
             else if (input.key == 's' || input.key == 'S')
             {
                 prefs.disableSound = !prefs.disableSound;
@@ -342,6 +387,7 @@ void showTableSelectionScreen()
                 // stale now, so refresh rather than keep navigating it
                 break;
             }
+#endif
             else if (input.key == 'n' || input.key == 'N')
             {
                 showPlayerNameScreen();
@@ -368,7 +414,7 @@ void showTableSelectionScreen()
                 j = 9 + tableIndex * 2;
 
                 drawBlank(LMAR - 2, j);
-                drawTextAlt(LMAR, j, table->name);
+                drawRoomNameAlt(LMAR, j, roomName(table->name));
                 drawTextAlt(RMAR - 5, j, table->players);
 
                 // Move table index to new table
@@ -381,7 +427,7 @@ void showTableSelectionScreen()
                 j = 9 + tableIndex * 2;
 
                 drawIcon(LMAR - 2, j, ICON_MARK);
-                drawText(LMAR, j, table->name);
+                drawText(LMAR, j, roomName(table->name));
                 drawText(RMAR - 5, j, table->players);
 
                 soundCursor();
@@ -399,7 +445,7 @@ void showTableSelectionScreen()
 
             // Clear screen and write server name
             resetScreen();
-            centerText(15, clientState.tables.table[tableIndex].name);
+            centerText(15, roomName(clientState.tables.table[tableIndex].name));
 
             strcpy(query, "?table=");
             strcat(query, clientState.tables.table[tableIndex].table);
@@ -413,7 +459,7 @@ void showTableSelectionScreen()
         }
     }
 
-    centerTextAlt(17, "connecting to server");
+    centerTextAlt(17, TXT("connecting to server", "Connecting to server"));
     progressAnim(19);
 
     // Append player name to query
@@ -458,9 +504,11 @@ void showInGameMenuScreen()
         drawTextAlt(INGAME_MENU_X, y, MENU_QUIT_TEXT);
         drawTextAlt(INGAME_MENU_X, y += 2, MENU_HELP_TEXT);
         if (prefs.colorMode)
-            drawTextAlt(INGAME_MENU_X, y += 2, "  C: color mode");
+            drawTextAlt(INGAME_MENU_X, y += 2, TXT("  C: color mode", "  C: Color mode"));
 
+#ifndef NO_SOUND
         drawTextAlt(INGAME_MENU_X, y += 2, prefs.disableSound ? MENU_SOUND_OFF_TEXT : MENU_SOUND_ON_TEXT);
+#endif
 
         drawBox(INGAME_MENU_X - 2, HEIGHT / 2 - 5, 19, y - (HEIGHT / 2 - 5) + 1);
 
@@ -480,6 +528,7 @@ void showInGameMenuScreen()
             }
             switch (input.key)
             {
+#ifndef NO_SOUND
             case 's':
             case 'S':
                 prefs.disableSound = !prefs.disableSound;
@@ -487,6 +536,7 @@ void showInGameMenuScreen()
                 soundSelect();
                 savePrefs();
                 break;
+#endif
             case 'c':
             case 'C':
                 cycleNextColor();
@@ -507,7 +557,7 @@ void showInGameMenuScreen()
             case 'q':
             case 'Q':
                 resetScreen();
-                centerText(10, "please wait");
+                centerText(10, TXT("please wait", "Please wait"));
 
                 //  Clear server app key in case of reboot
                 write_appkey(AK_LOBBY_CREATOR_ID, AK_LOBBY_APP_ID, AK_LOBBY_KEY_SERVER, 0, (char *)"");

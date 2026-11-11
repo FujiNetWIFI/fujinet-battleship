@@ -43,6 +43,17 @@ void showInGameMenuScreen();
 /// @brief Allow the player to modify their name
 void showPlayerNameScreen();
 
+/// @brief Room and player names as shown. The server sends both in lower
+/// case; where the platform shows both cases, rooms go in capitals, this
+/// player's name as entered and the computer players' capitalized.
+#ifdef MIXED_CASE
+const char *roomName(const char *name);
+const char *playerLabel(const char *name);
+#else
+#define roomName(name) (name)
+#define playerLabel(name) (name)
+#endif
+
 /// @brief Draw the title
 void drawLogo();
 

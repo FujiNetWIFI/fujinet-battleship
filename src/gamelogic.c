@@ -103,10 +103,10 @@ void renderLobby()
 
         // Round 0 - Ready Up screen
         drawLogo();
-        centerText(6, clientState.lobby.serverName);
+        centerText(6, roomName(clientState.lobby.serverName));
 
         drawLine(READY_LEFT, 7, 16);
-        centerTextAlt(HEIGHT - 4, "press " ESCAPE " for menu");
+        centerTextAlt(HEIGHT - 4, TXT("press ", "Press ") ESCAPE " for menu");
         centerTextAlt(HEIGHT - 1, READY_PROMPT_TEXT);
 
         // Reset ship placement ahead of next screen
@@ -139,16 +139,16 @@ void renderLobby()
     {
         if (i < clientState.lobby.playerCount)
         {
-            drawText(READY_LEFT, 8 + i, clientState.lobby.players[i].name);
+            drawText(READY_LEFT, 8 + i, playerLabel(clientState.lobby.players[i].name));
             len = (uint8_t)strlen(clientState.lobby.players[i].name);
             if (len < 8)
             {
                 drawSpace(READY_LEFT + len, 8 + i, 8 - len);
             }
-            drawText(READY_LEFT, 8 + i, clientState.lobby.players[i].name);
+            drawText(READY_LEFT, 8 + i, playerLabel(clientState.lobby.players[i].name));
             if (clientState.lobby.players[i].ready)
             {
-                drawTextAlt(READY_LEFT + 11, 8 + i, "ready");
+                drawTextAlt(READY_LEFT + 11, 8 + i, TXT("ready", "Ready"));
             }
             else
             {
@@ -325,7 +325,7 @@ void renderGameboard()
 
         if (clientState.game.status == STATUS_PLACE_SHIPS)
         {
-            centerText(5, "place your five ships");
+            centerText(5, TXT("place your five ships", "Place your five ships"));
             centerTextAlt(7, ROTATE_PROMPT_TEXT);
         }
         if (clientState.game.status >= STATUS_GAMESTART)
@@ -432,7 +432,7 @@ void renderGameboard()
             {
                 // Draw player name
                 if (i != clientState.game.activePlayer)
-                    drawPlayerName(i, i == 0 && clientState.game.playerStatus != PLAYER_STATUS_VIEWING ? "you" : (const char *)clientState.game.players[i].name, false);
+                    drawPlayerName(i, i == 0 && clientState.game.playerStatus != PLAYER_STATUS_VIEWING ? TXT("you", "You") : playerLabel((const char *)clientState.game.players[i].name), false);
             }
 
             // Indicate active player if not game over
@@ -441,7 +441,7 @@ void renderGameboard()
                 // Show active player
                 if (clientState.game.activePlayer >= 0)
                 {
-                    drawPlayerName(clientState.game.activePlayer, clientState.game.activePlayer == 0 && clientState.game.playerStatus != PLAYER_STATUS_VIEWING ? "you" : (const char *)clientState.game.players[clientState.game.activePlayer].name, true);
+                    drawPlayerName(clientState.game.activePlayer, clientState.game.activePlayer == 0 && clientState.game.playerStatus != PLAYER_STATUS_VIEWING ? TXT("you", "You") : playerLabel((const char *)clientState.game.players[clientState.game.activePlayer].name), true);
                 }
 
                 // Blink active player
@@ -449,10 +449,10 @@ void renderGameboard()
                 {
 
                     pause(15);
-                    drawPlayerName(clientState.game.activePlayer, clientState.game.players[clientState.game.activePlayer].name, false);
+                    drawPlayerName(clientState.game.activePlayer, playerLabel(clientState.game.players[clientState.game.activePlayer].name), false);
 
                     pause(15);
-                    drawPlayerName(clientState.game.activePlayer, clientState.game.players[clientState.game.activePlayer].name, true);
+                    drawPlayerName(clientState.game.activePlayer, playerLabel(clientState.game.players[clientState.game.activePlayer].name), true);
                     pause(15);
                 }
             }
@@ -776,6 +776,11 @@ void centerTextWide(uint8_t y, const char *text)
 
     drawSpace(0, y, x);
     drawText(x, y, text);
+#ifdef MIXED_CASE
+    // The server's prompts are all lower case
+    if (text[0] >= 'a' && text[0] <= 'z')
+        drawIcon(x, y, text[0] - 32);
+#endif
     drawSpace(x + i, y, WIDTH - x - i);
 }
 
@@ -842,8 +847,10 @@ bool inputFieldCycle(uint8_t x, uint8_t y, uint8_t max, char *buffer)
         )
         {
 
+#ifndef MIXED_CASE
             if (input.key >= 65 && input.key <= 90)
                 input.key += 32;
+#endif
 
             buffer[curx] = input.key;
             buffer[++curx] = 0;
