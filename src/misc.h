@@ -35,7 +35,13 @@
 
 #define PLAYER_MAX 4
 
-#define FUJITZEE_SCORE 14
+// Screen text: lower case with capitals for emphasis, or real text on
+// platforms that show both cases
+#ifdef MIXED_CASE
+#define TXT(lower, mixed) mixed
+#else
+#define TXT(lower, mixed) lower
+#endif
 
 #define STATUS_LOBBY 0
 #define STATUS_PLACE_SHIPS 1

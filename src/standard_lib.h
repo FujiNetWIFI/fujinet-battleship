@@ -59,6 +59,19 @@ unsigned char kbhit (void);
 /* (Blocking) Return a synthesized key code. */
 unsigned char cgetc (void);
 
+#elif defined(__TRS80M2__)
+// src/model2/input.c reads the P&T BIOS's console raw. unsigned for the same
+// sign-extension reason as the Adam above.
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+/* (Non blocking) Return non-zero if a key is waiting. */
+unsigned char kbhit (void);
+
+/* (Blocking) Return a key code. */
+unsigned char cgetc (void);
+
 #elif defined(__H89__)
 // The H19 terminal: src/h89/input.c reads the console through HDOS SCIN or
 // the CP/M BIOS and decodes the keypad's ESC A-D into arrow codes 0xA0-0xA3.
